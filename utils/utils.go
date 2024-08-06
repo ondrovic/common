@@ -108,6 +108,22 @@ func FormatSize(bytes int64) string {
 	return "0 B"
 }
 
+
+// FormatPath formats the path based on the operating system
+func FormatPath(path string, goos string) string {
+	switch goos {
+	case "windows":
+		// Convert to Windows style paths (with backslashes)
+		return filepath.FromSlash(path)
+	case "linux", "darwin":
+		// Convert to Unix style paths (with forward slashes)
+		return filepath.ToSlash(path)
+	default:
+		// Default to Unix style paths
+		return path
+	}
+}
+
 // IsExtensionValid checks if the file's extension is allowed for a given file type.
 func IsExtensionValid(fileType types.FileType, path string) bool {
 	ext := strings.ToLower(filepath.Ext(path))

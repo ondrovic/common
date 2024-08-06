@@ -138,6 +138,26 @@ func TestFormatSize(t *testing.T) {
 	}
 }
 
+func TestFormatPath(t *testing.T) {
+	tests := []*types.TestLayout[struct{Path, GOOS string}, string] {
+		{Name: "Test Windows path formatting", Input: struct{ Path, GOOS string }{Path: `C:\path\to\file`, GOOS: "windows"}, Expected: `C:\path\to\file`, Err: nil},
+		{Name: "Test Linux path formatting", Input: struct{ Path, GOOS string }{Path: `\path\to\file`, GOOS: "linux"}, Expected: `/path/to/file`, Err: nil},
+		{Name: "Test macOS path formatting", Input: struct{ Path, GOOS string }{Path: `/path/to/file`, GOOS: "darwin"}, Expected: `/path/to/file`, Err: nil},
+		{Name: "Test default case for Unix", Input: struct{ Path, GOOS string }{Path: `/path/to/file`, GOOS: "unknown"}, Expected: `/path/to/file`, Err: nil},
+		{Name: "Test Windows path with forward slashes", Input: struct{ Path, GOOS string }{Path: `C:/path/to/file`, GOOS: "windows"}, Expected: `C:\path\to\file`, Err: nil},
+		{Name: "Test Unix path with backslashes", Input: struct{ Path, GOOS string }{Path: `\path\to\file`, GOOS: "linux"}, Expected: `/path/to/file`, Err: nil},
+	}
+
+	for _, test := range tests {
+		t.Run(test.Name, func(t *testing.T) { // Run each test case as a sub-test
+			result := FormatPath(test.Input.Path, test.Input.GOOS)
+			if result != test.Expected {
+				t.Errorf("FormatPath(%q, %q) = %q; expected %q", test.Input.Path, test.Input.GOOS, result, test.Expected)
+			}
+		})
+	}
+}
+
 func TestIsExtensionValid(t *testing.T) {
 	tests := []*types.TestLayout[struct {
 		fileType types.FileType
