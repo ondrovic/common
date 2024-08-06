@@ -1,3 +1,3 @@
-module github.com/ondrovic/go-shared-lib
+module github.com/ondrovic/common
 
 go 1.22.5

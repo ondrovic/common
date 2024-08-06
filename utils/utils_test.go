@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os/exec"
 	"testing"
+
+	"github.com/ondrovic/common/types"
 )
 
 // MockCmd is a mock implementation of CommandExecutor for simulating errors
@@ -17,7 +19,7 @@ func (m *MockCmd) Run() error {
 }
 
 func TestClearTerminalScreen(t *testing.T) {
-	tests := []*TestLayout[string, error]{
+	tests := []*types.TestLayout[string, error]{
 		{Name: "Windows", Input: "windows", Expected: nil},
 		// {Name: "Linux", Input: "linux", Expected: nil},
 		// {Name: "macOS", Input: "darwin", Expected: nil},
@@ -51,16 +53,16 @@ func TestClearTerminalScreen(t *testing.T) {
 }
 
 func TestToFileType(t *testing.T) {
-	tests := []*TestLayout[string, FileType]{
-		{Name: "Test any type", Input: "any", Expected: Any, Err: nil},
-		{Name: "Test video type", Input: "video", Expected: Video, Err: nil},
-		{Name: "Test image type", Input: "image", Expected: Image, Err: nil},
-		{Name: "Test archive type", Input: "archive", Expected: Archive, Err: nil},
-		{Name: "Test documents type", Input: "documents", Expected: Documents, Err: nil},
-		{Name: "Test case-insensitive", Input: "ANY", Expected: Any, Err: nil}, // Case-insensitive check
-		{Name: "Test mixed case", Input: "ViDeO", Expected: Video, Err: nil},   // Mixed case check
-		{Name: "Test invalid input", Input: "invalid", Expected: "", Err: nil}, // Invalid input check
-		{Name: "Test empty input", Input: "", Expected: "", Err: nil},          // Empty string check
+	tests := []*types.TestLayout[string, types.FileType]{
+		{Name: "Test any type", Input: "any", Expected: types.FileTypes.Any, Err: nil},
+		{Name: "Test video type", Input: "video", Expected: types.FileTypes.Video, Err: nil},
+		{Name: "Test image type", Input: "image", Expected: types.FileTypes.Image, Err: nil},
+		{Name: "Test archive type", Input: "archive", Expected: types.FileTypes.Archive, Err: nil},
+		{Name: "Test documents type", Input: "documents", Expected: types.FileTypes.Documents, Err: nil},
+		{Name: "Test case-insensitive", Input: "ANY", Expected: types.FileTypes.Any, Err: nil}, // Case-insensitive check
+		{Name: "Test mixed case", Input: "ViDeO", Expected: types.FileTypes.Video, Err: nil},   // Mixed case check
+		{Name: "Test invalid input", Input: "invalid", Expected: "", Err: nil},                 // Invalid input check
+		{Name: "Test empty input", Input: "", Expected: "", Err: nil},                          // Empty string check
 	}
 
 	for _, test := range tests {
@@ -74,27 +76,27 @@ func TestToFileType(t *testing.T) {
 }
 
 func TestToOperatorType(t *testing.T) {
-	tests := []*TestLayout[string, OperatorType]{
-		{Name: "Test equal to", Input: "equal to", Expected: EqualTo, Err: nil},
-		{Name: `Test equalto`, Input: "equalto", Expected: EqualTo, Err: nil},
-		{Name: "Test equal", Input: "equal", Expected: EqualTo, Err: nil},
-		{Name: "Test ==", Input: "==", Expected: EqualTo, Err: nil},
+	tests := []*types.TestLayout[string, types.OperatorType]{
+		{Name: "Test equal to", Input: "equal to", Expected: types.OperatorTypes.EqualTo, Err: nil},
+		{Name: `Test equalto`, Input: "equalto", Expected: types.OperatorTypes.EqualTo, Err: nil},
+		{Name: "Test equal", Input: "equal", Expected: types.OperatorTypes.EqualTo, Err: nil},
+		{Name: "Test ==", Input: "==", Expected: types.OperatorTypes.EqualTo, Err: nil},
 
-		{Name: "Test greater than", Input: "greater than", Expected: GreaterThan, Err: nil},
-		{Name: "Test greaterthan", Input: "greaterthan", Expected: GreaterThan, Err: nil},
-		{Name: "Test >", Input: ">", Expected: GreaterThan, Err: nil},
+		{Name: "Test greater than", Input: "greater than", Expected: types.OperatorTypes.GreaterThan, Err: nil},
+		{Name: "Test greaterthan", Input: "greaterthan", Expected: types.OperatorTypes.GreaterThan, Err: nil},
+		{Name: "Test >", Input: ">", Expected: types.OperatorTypes.GreaterThan, Err: nil},
 
-		{Name: "Test greater than or equal to", Input: "greater than or equal to", Expected: GreaterThanEqualTo, Err: nil},
-		{Name: "Test greaterthanorequalto", Input: "greaterthanorequalto", Expected: GreaterThanEqualTo, Err: nil},
-		{Name: "Test >=", Input: ">=", Expected: GreaterThanEqualTo, Err: nil},
+		{Name: "Test greater than or equal to", Input: "greater than or equal to", Expected: types.OperatorTypes.GreaterThanEqualTo, Err: nil},
+		{Name: "Test greaterthanorequalto", Input: "greaterthanorequalto", Expected: types.OperatorTypes.GreaterThanEqualTo, Err: nil},
+		{Name: "Test >=", Input: ">=", Expected: types.OperatorTypes.GreaterThanEqualTo, Err: nil},
 
-		{Name: "Test less than", Input: "less than", Expected: LessThan, Err: nil},
-		{Name: "Test lessthan", Input: "lessthan", Expected: LessThan, Err: nil},
-		{Name: "Test <", Input: "<", Expected: LessThan, Err: nil},
+		{Name: "Test less than", Input: "less than", Expected: types.OperatorTypes.LessThan, Err: nil},
+		{Name: "Test lessthan", Input: "lessthan", Expected: types.OperatorTypes.LessThan, Err: nil},
+		{Name: "Test <", Input: "<", Expected: types.OperatorTypes.LessThan, Err: nil},
 
-		{Name: "Test less than or equal to", Input: "less than or equal to", Expected: LessThanEqualTo, Err: nil},
-		{Name: "Test lessthanorequalto", Input: "lessthanorequalto", Expected: LessThanEqualTo, Err: nil},
-		{Name: "Test <=", Input: "<=", Expected: LessThanEqualTo, Err: nil},
+		{Name: "Test less than or equal to", Input: "less than or equal to", Expected: types.OperatorTypes.LessThanEqualTo, Err: nil},
+		{Name: "Test lessthanorequalto", Input: "lessthanorequalto", Expected: types.OperatorTypes.LessThanEqualTo, Err: nil},
+		{Name: "Test <=", Input: "<=", Expected: types.OperatorTypes.LessThanEqualTo, Err: nil},
 
 		{Name: "Test default case", Input: "", Expected: "", Err: nil},
 	}
@@ -110,7 +112,7 @@ func TestToOperatorType(t *testing.T) {
 }
 
 func TestFormatSize(t *testing.T) {
-	tests := []*TestLayout[int64, string]{
+	tests := []*types.TestLayout[int64, string]{
 		{Name: "Test 0 B", Input: 0, Expected: "0 B", Err: nil},
 		{Name: "Test 1 B", Input: 1, Expected: "1.00 B", Err: nil},
 		{Name: "Test 2 B", Input: 2, Expected: "2.00 B", Err: nil},
@@ -137,91 +139,91 @@ func TestFormatSize(t *testing.T) {
 }
 
 func TestIsExtensionValid(t *testing.T) {
-	tests := []*TestLayout[struct {
-		fileType FileType
+	tests := []*types.TestLayout[struct {
+		fileType types.FileType
 		path     string
 	}, bool]{
 		// Tests for Any file type (wildcard)
 		{Name: "Any - valid extension", Input: struct {
-			fileType FileType
+			fileType types.FileType
 			path     string
-		}{fileType: Any, path: "example.file"}, Expected: true},
+		}{fileType: types.FileTypes.Any, path: "example.file"}, Expected: true},
 		{Name: "Any - no extension", Input: struct {
-			fileType FileType
+			fileType types.FileType
 			path     string
-		}{fileType: Any, path: "example"}, Expected: true},
+		}{fileType: types.FileTypes.Any, path: "example"}, Expected: true},
 
 		// Tests for Video file type
 		{Name: "Video - valid extension .mp4", Input: struct {
-			fileType FileType
+			fileType types.FileType
 			path     string
-		}{fileType: Video, path: "video.mp4"}, Expected: true},
+		}{fileType: types.FileTypes.Video, path: "video.mp4"}, Expected: true},
 		{Name: "Video - invalid extension .txt", Input: struct {
-			fileType FileType
+			fileType types.FileType
 			path     string
-		}{fileType: Video, path: "document.txt"}, Expected: false},
+		}{fileType: types.FileTypes.Video, path: "document.txt"}, Expected: false},
 		{Name: "Video - empty extension", Input: struct {
-			fileType FileType
+			fileType types.FileType
 			path     string
-		}{fileType: Video, path: "video"}, Expected: false},
+		}{fileType: types.FileTypes.Video, path: "video"}, Expected: false},
 
 		// Tests for Image file type
 		{Name: "Image - valid extension .jpg", Input: struct {
-			fileType FileType
+			fileType types.FileType
 			path     string
-		}{fileType: Image, path: "picture.jpg"}, Expected: true},
+		}{fileType: types.FileTypes.Image, path: "picture.jpg"}, Expected: true},
 		{Name: "Image - valid extension .png", Input: struct {
-			fileType FileType
+			fileType types.FileType
 			path     string
-		}{fileType: Image, path: "picture.png"}, Expected: true},
+		}{fileType: types.FileTypes.Image, path: "picture.png"}, Expected: true},
 		{Name: "Image - invalid extension .mp4", Input: struct {
-			fileType FileType
+			fileType types.FileType
 			path     string
-		}{fileType: Image, path: "video.mp4"}, Expected: false},
+		}{fileType: types.FileTypes.Image, path: "video.mp4"}, Expected: false},
 		{Name: "Image - empty extension", Input: struct {
-			fileType FileType
+			fileType types.FileType
 			path     string
-		}{fileType: Image, path: "picture"}, Expected: false},
+		}{fileType: types.FileTypes.Image, path: "picture"}, Expected: false},
 
 		// Tests for Archive file type
 		{Name: "Archive - valid extension .zip", Input: struct {
-			fileType FileType
+			fileType types.FileType
 			path     string
-		}{fileType: Archive, path: "archive.zip"}, Expected: true},
+		}{fileType: types.FileTypes.Archive, path: "archive.zip"}, Expected: true},
 		{Name: "Archive - valid extension .tar", Input: struct {
-			fileType FileType
+			fileType types.FileType
 			path     string
-		}{fileType: Archive, path: "archive.tar"}, Expected: true},
+		}{fileType: types.FileTypes.Archive, path: "archive.tar"}, Expected: true},
 		{Name: "Archive - invalid extension .jpg", Input: struct {
-			fileType FileType
+			fileType types.FileType
 			path     string
-		}{fileType: Archive, path: "image.jpg"}, Expected: false},
+		}{fileType: types.FileTypes.Archive, path: "image.jpg"}, Expected: false},
 		{Name: "Archive - empty extension", Input: struct {
-			fileType FileType
+			fileType types.FileType
 			path     string
-		}{fileType: Archive, path: "archive"}, Expected: false},
+		}{fileType: types.FileTypes.Archive, path: "archive"}, Expected: false},
 
 		// Tests for Documents file type
 		{Name: "Documents - valid extension .pdf", Input: struct {
-			fileType FileType
+			fileType types.FileType
 			path     string
-		}{fileType: Documents, path: "document.pdf"}, Expected: true},
+		}{fileType: types.FileTypes.Documents, path: "document.pdf"}, Expected: true},
 		{Name: "Documents - valid extension .docx", Input: struct {
-			fileType FileType
+			fileType types.FileType
 			path     string
-		}{fileType: Documents, path: "document.docx"}, Expected: true},
+		}{fileType: types.FileTypes.Documents, path: "document.docx"}, Expected: true},
 		{Name: "Documents - invalid extension .mp4", Input: struct {
-			fileType FileType
+			fileType types.FileType
 			path     string
-		}{fileType: Documents, path: "video.mp4"}, Expected: false},
+		}{fileType: types.FileTypes.Documents, path: "video.mp4"}, Expected: false},
 		{Name: "Documents - empty extension", Input: struct {
-			fileType FileType
+			fileType types.FileType
 			path     string
-		}{fileType: Documents, path: "document"}, Expected: false},
+		}{fileType: types.FileTypes.Documents, path: "document"}, Expected: false},
 
 		// Test for fileType not present in FileExtensions map
 		{Name: "Unknown type - any extension", Input: struct {
-			fileType FileType
+			fileType types.FileType
 			path     string
 		}{fileType: "unknown_type", path: "file.any"}, Expected: false},
 	}

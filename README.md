@@ -1,2 +1,2 @@
-# go-shared-lib
-Shared Library functions
+# common
+Shared common code for my packages

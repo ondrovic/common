@@ -7,27 +7,9 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"github.com/ondrovic/common/types"
 )
-
-// FileType
-type FileType string
-
-// OperatorType
-type OperatorType string
-
-// SizeUnit struct for units
-type SizeUnit struct {
-	Label string
-	Size  int64
-}
-
-// TestLayout
-type TestLayout[InputT any, ExpectedT any] struct {
-	Name     string
-	Input    InputT
-	Expected ExpectedT
-	Err      error
-}
 
 // CommandExecutor is an interface for executing commands
 type CommandExecutor interface {
@@ -45,60 +27,7 @@ func (r *RealCmd) Run() error {
 	return r.cmd.Run()
 }
 
-// FileTypes
-const (
-	Any       FileType = "Any"
-	Video     FileType = "Video"
-	Image     FileType = "Image"
-	Archive   FileType = "Archive"
-	Documents FileType = "Documents"
-)
-
-// OperatorTypes
-const (
-	EqualTo            OperatorType = "Equal To"
-	GreaterThan        OperatorType = "Greater Than"
-	GreaterThanEqualTo OperatorType = "Greater Than Or Equal To"
-	LessThan           OperatorType = "Less Than"
-	LessThanEqualTo    OperatorType = "Less Than Or Equal To"
-)
-
 var (
-	// SizeUnits
-	SizeUnits = []SizeUnit{
-		{Label: "PB", Size: 1 << 50}, // Petabyte
-		{Label: "TB", Size: 1 << 40}, // Terabyte
-		{Label: "GB", Size: 1 << 30}, // Gigabyte
-		{Label: "MB", Size: 1 << 20}, // Megabyte
-		{Label: "KB", Size: 1 << 10}, // Kilobyte
-		{Label: "B", Size: 1},        // Byte
-	}
-	// FileExtensions
-	FileExtensions = map[FileType]map[string]bool{
-		Any: {
-			"*.*": true,
-		},
-		Video: {
-			".mp4": true, ".avi": true, ".mkv": true, ".mov": true, ".wmv": true,
-			".flv": true, ".webm": true, ".m4v": true, ".mpg": true, ".mpeg": true,
-			".ts": true,
-		},
-		Image: {
-			".jpg": true, ".jpeg": true, ".png": true, ".gif": true, ".bmp": true,
-			".tiff": true, ".webp": true, ".svg": true, ".raw": true, ".heic": true,
-			".ico": true,
-		},
-		Archive: {
-			".zip": true, ".rar": true, ".7z": true, ".tar": true, ".gz": true,
-			".bz2": true, ".xz": true, ".iso": true, ".tgz": true, ".tbz2": true,
-		},
-		Documents: {
-			".docx": true, ".doc": true, ".pdf": true, ".txt": true, ".rtf": true,
-			".odt": true, ".xlsx": true, ".xls": true, ".pptx": true, ".ppt": true,
-			".csv": true, ".md": true, ".pages": true,
-		},
-	}
-
 	execCommand = func(name string, arg ...string) CommandExecutor {
 		return &RealCmd{cmd: exec.Command(name, arg...)}
 	}
@@ -130,36 +59,36 @@ func ClearTerminalScreen(goos string) error {
 }
 
 // ToFileType
-func ToFileType(fileType string) FileType {
+func ToFileType(fileType string) types.FileType {
 	switch strings.ToLower(fileType) {
 	case "any":
-		return Any
+		return types.FileTypes.Any
 	case "video":
-		return Video
+		return types.FileTypes.Video
 	case "image":
-		return Image
+		return types.FileTypes.Image
 	case "archive":
-		return Archive
+		return types.FileTypes.Archive
 	case "documents":
-		return Documents
+		return types.FileTypes.Documents
 	default:
 		return ""
 	}
 }
 
 // ToOperatorType
-func ToOperatorType(operatorType string) OperatorType {
+func ToOperatorType(operatorType string) types.OperatorType {
 	switch strings.ToLower(operatorType) {
 	case "equal to", "equalto", "equal", "==":
-		return EqualTo
+		return types.OperatorTypes.EqualTo
 	case "greater than", "greaterthan", ">":
-		return GreaterThan
+		return types.OperatorTypes.GreaterThan
 	case "greater than or equal to", "greaterthanorequalto", ">=":
-		return GreaterThanEqualTo
+		return types.OperatorTypes.GreaterThanEqualTo
 	case "less than", "lessthan", "<":
-		return LessThan
+		return types.OperatorTypes.LessThan
 	case "less than or equal to", "lessthanorequalto", "<=":
-		return LessThanEqualTo
+		return types.OperatorTypes.LessThanEqualTo
 	default:
 		return ""
 	}
@@ -167,7 +96,7 @@ func ToOperatorType(operatorType string) OperatorType {
 
 // FormatSize formats size to human readable
 func FormatSize(bytes int64) string {
-	for _, unit := range SizeUnits {
+	for _, unit := range types.SizeUnits {
 		if bytes >= unit.Size {
 			value := float64(bytes) / float64(unit.Size)
 			// Round the value to two decimal places
@@ -180,9 +109,9 @@ func FormatSize(bytes int64) string {
 }
 
 // IsExtensionValid checks if the file's extension is allowed for a given file type.
-func IsExtensionValid(fileType FileType, path string) bool {
+func IsExtensionValid(fileType types.FileType, path string) bool {
 	ext := strings.ToLower(filepath.Ext(path))
-	extensions, exists := FileExtensions[fileType]
+	extensions, exists := types.FileExtensions[fileType]
 	if !exists {
 		return false
 	}
