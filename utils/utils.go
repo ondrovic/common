@@ -7,10 +7,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-
-	// "github.com/ondrovic/go-shared-lib/consts"
-	// "github.com/ondrovic/go-shared-lib/types"
-	// "github.com/ondrovic/go-shared-lib/vars"
 )
 
 // FileType
@@ -66,7 +62,6 @@ const (
 	LessThan           OperatorType = "Less Than"
 	LessThanEqualTo    OperatorType = "Less Than Or Equal To"
 )
-
 
 var (
 	// SizeUnits
