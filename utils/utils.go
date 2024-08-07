@@ -1,12 +1,15 @@
 package utils
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"unicode"
 
 	"github.com/ondrovic/common/types"
 )
@@ -28,7 +31,7 @@ func (r *RealCmd) Run() error {
 }
 
 var (
-	execCommand = func(name string, arg ...string) CommandExecutor {
+	ExecCommand = func(name string, arg ...string) CommandExecutor {
 		return &RealCmd{cmd: exec.Command(name, arg...)}
 	}
 )
@@ -40,9 +43,9 @@ func ClearTerminalScreen(goos string) error {
 
 	switch strings.ToLower(goos) {
 	case "linux", "darwin":
-		cmd = execCommand("clear")
+		cmd = ExecCommand("clear")
 	case "windows":
-		cmd = execCommand("cmd", "/c", "cls")
+		cmd = ExecCommand("cmd", "/c", "cls")
 	default:
 		return fmt.Errorf("unsupported platform: %s", goos)
 	}
@@ -108,7 +111,6 @@ func FormatSize(bytes int64) string {
 	return "0 B"
 }
 
-
 // FormatPath formats the path based on the operating system
 func FormatPath(path string, goos string) string {
 	switch goos {
@@ -139,4 +141,79 @@ func IsExtensionValid(fileType types.FileType, path string) bool {
 
 	// Check if the file extension is explicitly allowed
 	return extensions[ext]
+}
+
+// getOperatorSizeMatches determines whether or not a file matches the size or tolerance size
+func GetOperatorSizeMatches(operator types.OperatorType, fileSize int64, toleranceSize int64, infoSize int64) bool {
+	switch operator {
+	case types.OperatorTypes.EqualTo:
+		return (infoSize == fileSize || infoSize == toleranceSize)
+	case types.OperatorTypes.LessThan:
+		return (infoSize < fileSize || infoSize < toleranceSize)
+	case types.OperatorTypes.LessThanEqualTo:
+		return (infoSize <= fileSize || infoSize <= toleranceSize)
+	case types.OperatorTypes.GreaterThan:
+		return (infoSize > fileSize || infoSize > toleranceSize)
+	case types.OperatorTypes.GreaterThanEqualTo:
+		return (infoSize >= fileSize || infoSize >= toleranceSize)
+	default:
+		return (infoSize == fileSize || infoSize == toleranceSize)
+	}
+}
+
+// CalculateToleranceToBytes calculates the tolerance size in bytes
+func CalculateToleranceToBytes(sizeStr string, tolerance float64) (int64, error) {
+	fileSize, err := ConvertStringSizeToBytes(sizeStr)
+	if err != nil {
+		return 0, err
+	}
+
+	toleranceFactor := tolerance / 100.0
+	newSize := float64(fileSize) * (1 + toleranceFactor)
+
+	nSize := int64(newSize)
+
+	return nSize, nil
+}
+
+// ConvertStringSizeToBytes converts a size string with a unit to bytes.
+func ConvertStringSizeToBytes(sizeStr string) (int64, error) {
+	sizeStr = strings.TrimSpace(sizeStr)
+	if sizeStr == "" {
+		return 0, errors.New("size cannot be empty")
+	}
+
+	// Separate the numeric part and the unit part
+	var numStr, unitStr string
+	for i, r := range sizeStr {
+		if unicode.IsLetter(r) {
+			numStr = strings.TrimSpace(sizeStr[:i])
+			unitStr = strings.TrimSpace(sizeStr[i:])
+			break
+		}
+	}
+
+	// If no unit was found, return an error
+	if unitStr == "" || numStr == "" {
+		return 0, errors.New("invalid size format")
+	}
+
+	// Normalize the unit string to uppercase
+	unitStr = strings.ToUpper(unitStr)
+
+	// Parse the numeric part
+	num, err := strconv.ParseFloat(numStr, 64)
+	if err != nil {
+		return 0, err
+	}
+
+	// Find the matching unit and convert to bytes
+	// for _, unit := range types.Units {
+	for _, unit := range types.SizeUnits {
+		if unit.Label == unitStr {
+			return int64(num * float64(unit.Size)), nil
+		}
+	}
+
+	return 0, errors.New("invalid size unit")
 }

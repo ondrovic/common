@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"errors"
 	"fmt"
 	"os/exec"
 	"testing"
@@ -18,6 +19,70 @@ func (m *MockCmd) Run() error {
 	return m.err
 }
 
+// MockExecCommand replaces execCommand for testing
+var MockExecCommand = func(name string, arg ...string) CommandExecutor {
+	return &MockCmd{}
+}
+
+// TestExeCommand test the ExeCommand var function
+func TestExecCommand(t *testing.T) {
+	// Override execCommand with a mock implementation
+	originalExecCommand := ExecCommand
+	ExecCommand = MockExecCommand
+	defer func() {
+		ExecCommand = originalExecCommand
+	}()
+
+	// Define test cases
+	tests := []*types.TestLayout[struct {
+		CmdName string
+		CmdArgs []string
+	}, string]{
+		{
+			Name: "Successful command execution",
+			Input: struct {
+				CmdName string
+				CmdArgs []string
+			}{
+				CmdName: "echo",
+				CmdArgs: []string{"hello"},
+			},
+			Expected: "hello",
+			Err:      nil,
+		},
+		{
+			Name: "Command execution with error",
+			Input: struct {
+				CmdName string
+				CmdArgs []string
+			}{
+				CmdName: "nonexistent_command",
+				CmdArgs: []string{},
+			},
+			Expected: "command not found",
+			Err:      nil,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.Name, func(t *testing.T) {
+			// Update mock behavior for each test case
+			mockCmd := &MockCmd{err: test.Err}
+			ExecCommand = func(name string, arg ...string) CommandExecutor {
+				return mockCmd
+			}
+
+			cmd := ExecCommand(test.Input.CmdName, test.Input.CmdArgs...)
+			err := cmd.Run()
+
+			if !errors.Is(err, test.Err) {
+				t.Errorf("ExecCommand(%v, %v) = %v; want %v", test.Input.CmdName, test.Input.CmdArgs, err, test.Expected)
+			}
+		})
+	}
+}
+
+// TestClearTerminalScreen tests the ClearTerminalScreen func
 func TestClearTerminalScreen(t *testing.T) {
 	tests := []*types.TestLayout[string, error]{
 		{Name: "Windows", Input: "windows", Expected: nil},
@@ -31,11 +96,11 @@ func TestClearTerminalScreen(t *testing.T) {
 		t.Run(test.Name, func(t *testing.T) {
 			// Mock execCommand function based on the test case
 			if test.Name == "Command Error" {
-				execCommand = func(name string, arg ...string) CommandExecutor {
+				ExecCommand = func(name string, arg ...string) CommandExecutor {
 					return &MockCmd{err: fmt.Errorf("mock error")}
 				}
 			} else {
-				execCommand = func(name string, arg ...string) CommandExecutor {
+				ExecCommand = func(name string, arg ...string) CommandExecutor {
 					return &RealCmd{cmd: exec.Command(name, arg...)}
 				}
 			}
@@ -52,6 +117,7 @@ func TestClearTerminalScreen(t *testing.T) {
 	}
 }
 
+// TestToFileType tests ToFileType func
 func TestToFileType(t *testing.T) {
 	tests := []*types.TestLayout[string, types.FileType]{
 		{Name: "Test any type", Input: "any", Expected: types.FileTypes.Any, Err: nil},
@@ -75,6 +141,7 @@ func TestToFileType(t *testing.T) {
 	}
 }
 
+// TestToOperatorType tests ToOperatorType func
 func TestToOperatorType(t *testing.T) {
 	tests := []*types.TestLayout[string, types.OperatorType]{
 		{Name: "Test equal to", Input: "equal to", Expected: types.OperatorTypes.EqualTo, Err: nil},
@@ -111,6 +178,7 @@ func TestToOperatorType(t *testing.T) {
 	}
 }
 
+// TestFormatSize tests FormatSize func
 func TestFormatSize(t *testing.T) {
 	tests := []*types.TestLayout[int64, string]{
 		{Name: "Test 0 B", Input: 0, Expected: "0 B", Err: nil},
@@ -138,8 +206,9 @@ func TestFormatSize(t *testing.T) {
 	}
 }
 
+// TestFormatPath tests FormatPath func
 func TestFormatPath(t *testing.T) {
-	tests := []*types.TestLayout[struct{Path, GOOS string}, string] {
+	tests := []*types.TestLayout[struct{ Path, GOOS string }, string]{
 		{Name: "Test Windows path formatting", Input: struct{ Path, GOOS string }{Path: `C:\path\to\file`, GOOS: "windows"}, Expected: `C:\path\to\file`, Err: nil},
 		{Name: "Test Linux path formatting", Input: struct{ Path, GOOS string }{Path: `\path\to\file`, GOOS: "linux"}, Expected: `/path/to/file`, Err: nil},
 		{Name: "Test macOS path formatting", Input: struct{ Path, GOOS string }{Path: `/path/to/file`, GOOS: "darwin"}, Expected: `/path/to/file`, Err: nil},
@@ -158,6 +227,7 @@ func TestFormatPath(t *testing.T) {
 	}
 }
 
+// TestIsExtensionValid tests IsExtensionValid func
 func TestIsExtensionValid(t *testing.T) {
 	tests := []*types.TestLayout[struct {
 		fileType types.FileType
@@ -253,6 +323,293 @@ func TestIsExtensionValid(t *testing.T) {
 			result := IsExtensionValid(test.Input.fileType, test.Input.path)
 			if result != test.Expected {
 				t.Errorf("IsExtensionValid(%q, %q) = %v; expected %v", test.Input.fileType, test.Input.path, result, test.Expected)
+			}
+		})
+	}
+}
+
+// TestGetOperatorSizeMatches tests GetOperatorSizeMatches func
+func TestGetOperatorSizeMatches(t *testing.T) {
+	tests := []types.TestLayout[struct {
+		Operator      types.OperatorType
+		FileSize      int64
+		ToleranceSize int64
+		InfoSize      int64
+	}, bool]{
+		{
+			Name: "EqualTo - Match FileSize",
+			Input: struct {
+				Operator      types.OperatorType
+				FileSize      int64
+				ToleranceSize int64
+				InfoSize      int64
+			}{
+				Operator:      types.OperatorTypes.EqualTo,
+				FileSize:      1024,
+				ToleranceSize: 0,
+				InfoSize:      1024,
+			},
+			Expected: true,
+		},
+		{
+			Name: "EqualTo - Match ToleranceSize",
+			Input: struct {
+				Operator      types.OperatorType
+				FileSize      int64
+				ToleranceSize int64
+				InfoSize      int64
+			}{
+				Operator:      types.OperatorTypes.EqualTo,
+				FileSize:      1024,
+				ToleranceSize: 1050,
+				InfoSize:      1050,
+			},
+			Expected: true,
+		},
+		{
+			Name: "LessThan - Less than FileSize",
+			Input: struct {
+				Operator      types.OperatorType
+				FileSize      int64
+				ToleranceSize int64
+				InfoSize      int64
+			}{
+				Operator:      types.OperatorTypes.LessThan,
+				FileSize:      1024,
+				ToleranceSize: 1050,
+				InfoSize:      512,
+			},
+			Expected: true,
+		},
+		{
+			Name: "LessThan - Less than or equal to FileSize",
+			Input: struct {
+				Operator      types.OperatorType
+				FileSize      int64
+				ToleranceSize int64
+				InfoSize      int64
+			}{
+				Operator:      types.OperatorTypes.LessThanEqualTo,
+				FileSize:      1024,
+				ToleranceSize: 1050,
+				InfoSize:      512,
+			},
+			Expected: true,
+		},
+		{
+			Name: "GreaterThanEqualTo - Greater than FileSize",
+			Input: struct {
+				Operator      types.OperatorType
+				FileSize      int64
+				ToleranceSize int64
+				InfoSize      int64
+			}{
+				Operator:      types.OperatorTypes.GreaterThan,
+				FileSize:      1024,
+				ToleranceSize: 0,
+				InfoSize:      2048,
+			},
+			Expected: true,
+		},
+		{
+			Name: "GreaterThanEqualTo - Greater than or equal to FileSize",
+			Input: struct {
+				Operator      types.OperatorType
+				FileSize      int64
+				ToleranceSize int64
+				InfoSize      int64
+			}{
+				Operator:      types.OperatorTypes.GreaterThanEqualTo,
+				FileSize:      1024,
+				ToleranceSize: 0,
+				InfoSize:      2048,
+			},
+			Expected: true,
+		},
+		{
+			Name: "Default Case - Invalid Operator",
+			Input: struct {
+				Operator      types.OperatorType
+				FileSize      int64
+				ToleranceSize int64
+				InfoSize      int64
+			}{
+				Operator:      types.OperatorType("invalid"), // an invalid operator
+				FileSize:      1024,
+				ToleranceSize: 1050,
+				InfoSize:      1024,
+			},
+			Expected: true, // The default case returns true if infoSize equals either fileSize or toleranceSize
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.Name, func(t *testing.T) {
+			result := GetOperatorSizeMatches(test.Input.Operator, test.Input.FileSize, test.Input.ToleranceSize, test.Input.InfoSize)
+
+			if result != test.Expected {
+				t.Errorf("GetOperatorSizeMatches(%v, %v, %v, %v) = %v; want %v",
+					test.Input.Operator,
+					test.Input.FileSize,
+					test.Input.ToleranceSize,
+					test.Input.InfoSize,
+					result,
+					test.Expected,
+				)
+			}
+		})
+	}
+}
+
+// TestCalculateToleranceToBytes test CalculateToleranceToBytes func
+func TestCalculateToleranceToBytes(t *testing.T) {
+	tests := []*types.TestLayout[struct {
+		sizeStr   string
+		tolerance float64
+	}, int64]{
+		{
+			Name: "1 KB with 10% tolerance",
+			Input: struct {
+				sizeStr   string
+				tolerance float64
+			}{"1 KB", 10},
+			Expected: 1126,
+			Err:      nil,
+		},
+		{
+			Name: "1 MB with 50% tolerance",
+			Input: struct {
+				sizeStr   string
+				tolerance float64
+			}{"1 MB", 50},
+			Expected: 1572864,
+			Err:      nil,
+		},
+		{
+			Name: "100 B with 100% tolerance",
+			Input: struct {
+				sizeStr   string
+				tolerance float64
+			}{"100 B", 100},
+			Expected: 200,
+			Err:      nil,
+		},
+		{
+			Name: "10 GB with 0% tolerance",
+			Input: struct {
+				sizeStr   string
+				tolerance float64
+			}{"10 GB", 0},
+			Expected: 10737418240,
+			Err:      nil,
+		},
+		{
+			Name: "2.5 KB with 20% tolerance",
+			Input: struct {
+				sizeStr   string
+				tolerance float64
+			}{"2.5 KB", 20},
+			Expected: 3072,
+			Err:      nil,
+		},
+		{
+			Name: "10 MB with 25% tolerance",
+			Input: struct {
+				sizeStr   string
+				tolerance float64
+			}{"10 MB", 25},
+			Expected: 13107200,
+			Err:      nil,
+		},
+		{
+			Name: "1000 B with 0% tolerance",
+			Input: struct {
+				sizeStr   string
+				tolerance float64
+			}{"1000 B", 0},
+			Expected: 1000,
+			Err:      nil,
+		},
+		{
+			Name: "5 GB with -10% tolerance",
+			Input: struct {
+				sizeStr   string
+				tolerance float64
+			}{"5 GB", -10},
+			Expected: 4831838208,
+			Err:      nil,
+		},
+		{
+			Name: "500 KB with 200% tolerance",
+			Input: struct {
+				sizeStr   string
+				tolerance float64
+			}{"500 KB", 200},
+			Expected: 1536000,
+			Err:      nil,
+		},
+		{
+			Name: "Empty size string",
+			Input: struct {
+				sizeStr   string
+				tolerance float64
+			}{"", 10},
+			Expected: 0,
+			Err:      errors.New("size string is empty"),
+		},
+		{
+			Name: "1 KB with -10% tolerance",
+			Input: struct {
+				sizeStr   string
+				tolerance float64
+			}{"1 KB", -10},
+			Expected: 921,
+			Err:      nil,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.Name, func(t *testing.T) {
+			result, err := CalculateToleranceToBytes(test.Input.sizeStr, test.Input.tolerance)
+			if (err != nil) != (test.Err != nil) {
+				t.Errorf("CalculateToleranceToBytes(%v, %v) error = %v; wantErr %v", test.Input.sizeStr, test.Input.tolerance, err, test.Err)
+				return
+			}
+			if result != test.Expected {
+				t.Errorf("CalculateToleranceToBytes(%v, %v) = %v; want %v", test.Input.sizeStr, test.Input.tolerance, result, test.Expected)
+			}
+		})
+	}
+
+}
+
+// TestConvertStringSizeToBytes tests ConvertStringSizeToBytes
+func TestConvertStringSizeToBytes(t *testing.T) {
+	tests := []*types.TestLayout[string, int64]{
+		{Name: "Test 1 B", Input: "1 B", Expected: 1, Err: nil},
+		{Name: "Test 10 KB", Input: "10 KB", Expected: 10 * 1024, Err: nil},
+		{Name: "Test 1 MB", Input: "1 MB", Expected: 1 * 1024 * 1024, Err: nil},
+		{Name: "Test 5 GB", Input: "5 GB", Expected: 5 * 1024 * 1024 * 1024, Err: nil},
+		{Name: "Test 100 GB", Input: "100 GB", Expected: 100 * 1024 * 1024 * 1024, Err: nil},
+		{Name: "Test 2.5 TB", Input: "2.5 TB", Expected: 2.5 * 1024 * 1024 * 1024 * 1024, Err: nil},
+		{Name: "Test 1 kB", Input: "1 kB", Expected: 1 * 1024, Err: nil},
+		{Name: "Test 1000", Input: "1000", Expected: 0, Err: errors.New("invalid size format")},
+		{Name: "Test 1000 M", Input: "1000 M", Expected: 0, Err: errors.New("invalid size unit")},
+		{Name: "Test 1000 XYZ", Input: "1000 XYZ", Expected: 0, Err: errors.New("invalid size unit")},
+		{Name: "Test not a size", Input: "not a size", Expected: 0, Err: errors.New("invalid size format")},
+		{Name: "Test 12.34.56 MB", Input: "12.34.56 MB", Expected: 0, Err: errors.New(`strconv.ParseFloat: parsing "12.34.56": invalid syntax`)},
+	}
+
+	for _, test := range tests {
+		t.Run(test.Input, func(t *testing.T) {
+			result, err := ConvertStringSizeToBytes(test.Input)
+
+			if result != test.Expected {
+				t.Errorf("ConvertStringSizeToBytes(%q) = %v; want %v", test.Input, result, test.Expected)
+			}
+
+			if (err != nil && test.Err == nil) || (err == nil && test.Err != nil) || (err != nil && test.Err != nil && err.Error() != test.Err.Error()) {
+				t.Errorf("ConvertStringSizeToBytes(%q) error = %v; want %v", test.Input, err, test.Err)
 			}
 		})
 	}
