@@ -53,8 +53,8 @@ func ClearTerminalScreen(goos string) error {
 	if cmd != nil {
 		err = cmd.Run()
 		if err != nil {
-			fmt.Printf("failed to clear terminal: %s\n", err)
-			return err
+			// fmt.Printf("failed to clear terminal: %s\n", err)
+			return fmt.Errorf("failed to clear terminal %s", err)
 		}
 	}
 
@@ -216,4 +216,34 @@ func ConvertStringSizeToBytes(sizeStr string) (int64, error) {
 	}
 
 	return 0, errors.New("invalid size unit")
+}
+
+// RemoveEmptyDir removes an empty directory and returns true if successful, false otherwise.
+func RemoveEmptyDir(dir string) (bool, error) {
+	// Check if the directory exists
+	info, err := os.Stat(dir)
+	if os.IsNotExist(err) {
+		return false, fmt.Errorf("directory does not exist: %v", err)
+	}
+	if !info.IsDir() {
+		return false, fmt.Errorf("%s is not a directory", dir)
+	}
+
+	// Check if the directory is empty
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return false, fmt.Errorf("failed to read directory: %v", err)
+	}
+
+	if len(entries) > 0 {
+		return false, fmt.Errorf("directory %s is not empty", dir)
+	}
+
+	// Remove the directory
+	err = os.Remove(dir)
+	if err != nil {
+		return false, fmt.Errorf("failed to remove directory: %v", err)
+	}
+
+	return true, nil
 }

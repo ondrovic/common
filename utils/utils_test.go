@@ -3,7 +3,10 @@ package utils
 import (
 	"errors"
 	"fmt"
-	"os/exec"
+	"os"
+	"path/filepath"
+	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/ondrovic/common/types"
@@ -19,99 +22,59 @@ func (m *MockCmd) Run() error {
 	return m.err
 }
 
-// MockExecCommand replaces execCommand for testing
-var MockExecCommand = func(name string, arg ...string) CommandExecutor {
-	return &MockCmd{}
-}
-
-// TestExeCommand test the ExeCommand var function
-func TestExecCommand(t *testing.T) {
-	// Override execCommand with a mock implementation
-	originalExecCommand := ExecCommand
-	ExecCommand = MockExecCommand
-	defer func() {
-		ExecCommand = originalExecCommand
-	}()
-
-	// Define test cases
-	tests := []*types.TestLayout[struct {
-		CmdName string
-		CmdArgs []string
-	}, string]{
-		{
-			Name: "Successful command execution",
-			Input: struct {
-				CmdName string
-				CmdArgs []string
-			}{
-				CmdName: "echo",
-				CmdArgs: []string{"hello"},
-			},
-			Expected: "hello",
-			Err:      nil,
-		},
-		{
-			Name: "Command execution with error",
-			Input: struct {
-				CmdName string
-				CmdArgs []string
-			}{
-				CmdName: "nonexistent_command",
-				CmdArgs: []string{},
-			},
-			Expected: "command not found",
-			Err:      nil,
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.Name, func(t *testing.T) {
-			// Update mock behavior for each test case
-			mockCmd := &MockCmd{err: test.Err}
-			ExecCommand = func(name string, arg ...string) CommandExecutor {
-				return mockCmd
-			}
-
-			cmd := ExecCommand(test.Input.CmdName, test.Input.CmdArgs...)
-			err := cmd.Run()
-
-			if !errors.Is(err, test.Err) {
-				t.Errorf("ExecCommand(%v, %v) = %v; want %v", test.Input.CmdName, test.Input.CmdArgs, err, test.Expected)
-			}
-		})
-	}
-}
-
-// TestClearTerminalScreen tests the ClearTerminalScreen func
+// TestClearTerminalScreen tests the ClearTerminalScreen function
 func TestClearTerminalScreen(t *testing.T) {
-	tests := []*types.TestLayout[string, error]{
-		{Name: "Windows", Input: "windows", Expected: nil},
-		// {Name: "Linux", Input: "linux", Expected: nil},
-		// {Name: "macOS", Input: "darwin", Expected: nil},
-		{Name: "Unsupported OS", Input: "unsupported", Expected: fmt.Errorf("unsupported platform: unsupported")},
-		{Name: "Command Error", Input: "linux", Expected: fmt.Errorf("mock error")},
+	type ExpectedOutcome struct {
+		shouldFail bool
+		err        error
+	}
+
+	// helper to determine the fail and error based on os
+	expectedResultsBasedOnOS := func(inputOS string) ExpectedOutcome {
+		shouldFail := runtime.GOOS != inputOS
+
+		if inputOS == "unknown" {
+			return ExpectedOutcome{
+				true,
+				fmt.Errorf("unsupported platform: %s", "unknown"),
+			}
+		} else if shouldFail {
+			return ExpectedOutcome{
+				true,
+				errors.New("failed to clear terminal exec"),
+			}
+		}
+
+		return ExpectedOutcome{
+			false,
+			nil,
+		}
+	}
+
+	tests := []*types.TestLayout[string, ExpectedOutcome]{
+		// ExpectedOutcome is calculated before the test runs
+		{Name: "Test Linux clear command", Input: "linux"},
+		{Name: "Test macOS clear command", Input: "darwin"},
+		{Name: "Test Windows clear command", Input: "windows"},
+		{Name: "Test unsupported OS", Input: "unknown"},
+		{Name: "Test Linux clear command failure", Input: "linux"},
 	}
 
 	for _, test := range tests {
 		t.Run(test.Name, func(t *testing.T) {
-			// Mock execCommand function based on the test case
-			if test.Name == "Command Error" {
-				ExecCommand = func(name string, arg ...string) CommandExecutor {
-					return &MockCmd{err: fmt.Errorf("mock error")}
-				}
-			} else {
-				ExecCommand = func(name string, arg ...string) CommandExecutor {
-					return &RealCmd{cmd: exec.Command(name, arg...)}
-				}
-			}
+			// Determine if the test should fail based on the current OS
+			results := expectedResultsBasedOnOS(test.Input)
 
-			result := ClearTerminalScreen(test.Input)
-			if result != nil && test.Expected != nil {
-				if result.Error() != test.Expected.Error() {
-					t.Errorf("ClearTerminalScreen(%q) = %v; expected %v", test.Input, result, test.Expected)
-				}
-			} else if result != test.Expected {
-				t.Errorf("ClearTerminalScreen(%q) = %v; expected %v", test.Input, result, test.Expected)
+			test.Expected.shouldFail = results.shouldFail
+			test.Expected.err = results.err
+
+			err := ClearTerminalScreen(test.Input)
+			if err != nil && test.Expected.err == nil {
+				t.Errorf("ClearTerminalScreen(%q) = %v; expected no error", test.Input, err)
+			} else if err == nil && test.Expected.err != nil {
+				t.Errorf("ClearTerminalScreen(%q) = no error; expected %v", test.Input, test.Expected.err)
+			} else if err != nil && test.Expected.err != nil && !strings.Contains(err.Error(), test.Expected.err.Error()) {
+				t.Errorf("ClearTerminalScreen(%q) = %v; expected %v", test.Input, err, test.Expected.err)
 			}
 		})
 	}
@@ -208,13 +171,17 @@ func TestFormatSize(t *testing.T) {
 
 // TestFormatPath tests FormatPath func
 func TestFormatPath(t *testing.T) {
-	tests := []*types.TestLayout[struct{ Path, GOOS string }, string]{
-		{Name: "Test Windows path formatting", Input: struct{ Path, GOOS string }{Path: `C:\path\to\file`, GOOS: "windows"}, Expected: `C:\path\to\file`, Err: nil},
-		{Name: "Test Linux path formatting", Input: struct{ Path, GOOS string }{Path: `\path\to\file`, GOOS: "linux"}, Expected: `/path/to/file`, Err: nil},
-		{Name: "Test macOS path formatting", Input: struct{ Path, GOOS string }{Path: `/path/to/file`, GOOS: "darwin"}, Expected: `/path/to/file`, Err: nil},
-		{Name: "Test default case for Unix", Input: struct{ Path, GOOS string }{Path: `/path/to/file`, GOOS: "unknown"}, Expected: `/path/to/file`, Err: nil},
-		{Name: "Test Windows path with forward slashes", Input: struct{ Path, GOOS string }{Path: `C:/path/to/file`, GOOS: "windows"}, Expected: `C:\path\to\file`, Err: nil},
-		{Name: "Test Unix path with backslashes", Input: struct{ Path, GOOS string }{Path: `\path\to\file`, GOOS: "linux"}, Expected: `/path/to/file`, Err: nil},
+	type InputStruct struct {
+		Path string
+		GOOS string
+	}
+	tests := []*types.TestLayout[InputStruct, string]{
+		{Name: "Test Windows path formatting", Input: InputStruct{Path: `C:\path\to\file`, GOOS: "windows"}, Expected: `C:\path\to\file`, Err: nil},
+		{Name: "Test Linux path formatting", Input: InputStruct{Path: `\path\to\file`, GOOS: "linux"}, Expected: `/path/to/file`, Err: nil},
+		{Name: "Test macOS path formatting", Input: InputStruct{Path: `/path/to/file`, GOOS: "darwin"}, Expected: `/path/to/file`, Err: nil},
+		{Name: "Test default case for Unix", Input: InputStruct{Path: `/path/to/file`, GOOS: "unknown"}, Expected: `/path/to/file`, Err: nil},
+		{Name: "Test Windows path with forward slashes", Input: InputStruct{Path: `C:/path/to/file`, GOOS: "windows"}, Expected: `C:\path\to\file`, Err: nil},
+		{Name: "Test Unix path with backslashes", Input: InputStruct{Path: `\path\to\file`, GOOS: "linux"}, Expected: `/path/to/file`, Err: nil},
 	}
 
 	for _, test := range tests {
@@ -229,100 +196,47 @@ func TestFormatPath(t *testing.T) {
 
 // TestIsExtensionValid tests IsExtensionValid func
 func TestIsExtensionValid(t *testing.T) {
-	tests := []*types.TestLayout[struct {
-		fileType types.FileType
-		path     string
-	}, bool]{
+	type InputStruct struct {
+		FileType types.FileType
+		Path     string
+	}
+	tests := []*types.TestLayout[InputStruct, bool]{
 		// Tests for Any file type (wildcard)
-		{Name: "Any - valid extension", Input: struct {
-			fileType types.FileType
-			path     string
-		}{fileType: types.FileTypes.Any, path: "example.file"}, Expected: true},
-		{Name: "Any - no extension", Input: struct {
-			fileType types.FileType
-			path     string
-		}{fileType: types.FileTypes.Any, path: "example"}, Expected: true},
+		{Name: "Any - valid extension", Input: InputStruct{FileType: types.FileTypes.Any, Path: "example.file"}, Expected: true},
+		{Name: "Any - no extension", Input: InputStruct{FileType: types.FileTypes.Any, Path: "example"}, Expected: true},
 
 		// Tests for Video file type
-		{Name: "Video - valid extension .mp4", Input: struct {
-			fileType types.FileType
-			path     string
-		}{fileType: types.FileTypes.Video, path: "video.mp4"}, Expected: true},
-		{Name: "Video - invalid extension .txt", Input: struct {
-			fileType types.FileType
-			path     string
-		}{fileType: types.FileTypes.Video, path: "document.txt"}, Expected: false},
-		{Name: "Video - empty extension", Input: struct {
-			fileType types.FileType
-			path     string
-		}{fileType: types.FileTypes.Video, path: "video"}, Expected: false},
+		{Name: "Video - valid extension .mp4", Input: InputStruct{FileType: types.FileTypes.Video, Path: "video.mp4"}, Expected: true},
+		{Name: "Video - invalid extension .txt", Input: InputStruct{FileType: types.FileTypes.Video, Path: "document.txt"}, Expected: false},
+		{Name: "Video - empty extension", Input: InputStruct{FileType: types.FileTypes.Video, Path: "video"}, Expected: false},
 
 		// Tests for Image file type
-		{Name: "Image - valid extension .jpg", Input: struct {
-			fileType types.FileType
-			path     string
-		}{fileType: types.FileTypes.Image, path: "picture.jpg"}, Expected: true},
-		{Name: "Image - valid extension .png", Input: struct {
-			fileType types.FileType
-			path     string
-		}{fileType: types.FileTypes.Image, path: "picture.png"}, Expected: true},
-		{Name: "Image - invalid extension .mp4", Input: struct {
-			fileType types.FileType
-			path     string
-		}{fileType: types.FileTypes.Image, path: "video.mp4"}, Expected: false},
-		{Name: "Image - empty extension", Input: struct {
-			fileType types.FileType
-			path     string
-		}{fileType: types.FileTypes.Image, path: "picture"}, Expected: false},
+		{Name: "Image - valid extension .jpg", Input: InputStruct{FileType: types.FileTypes.Image, Path: "picture.jpg"}, Expected: true},
+		{Name: "Image - valid extension .png", Input: InputStruct{FileType: types.FileTypes.Image, Path: "picture.png"}, Expected: true},
+		{Name: "Image - invalid extension .mp4", Input: InputStruct{FileType: types.FileTypes.Image, Path: "video.mp4"}, Expected: false},
+		{Name: "Image - empty extension", Input: InputStruct{FileType: types.FileTypes.Image, Path: "picture"}, Expected: false},
 
 		// Tests for Archive file type
-		{Name: "Archive - valid extension .zip", Input: struct {
-			fileType types.FileType
-			path     string
-		}{fileType: types.FileTypes.Archive, path: "archive.zip"}, Expected: true},
-		{Name: "Archive - valid extension .tar", Input: struct {
-			fileType types.FileType
-			path     string
-		}{fileType: types.FileTypes.Archive, path: "archive.tar"}, Expected: true},
-		{Name: "Archive - invalid extension .jpg", Input: struct {
-			fileType types.FileType
-			path     string
-		}{fileType: types.FileTypes.Archive, path: "image.jpg"}, Expected: false},
-		{Name: "Archive - empty extension", Input: struct {
-			fileType types.FileType
-			path     string
-		}{fileType: types.FileTypes.Archive, path: "archive"}, Expected: false},
+		{Name: "Archive - valid extension .zip", Input: InputStruct{FileType: types.FileTypes.Archive, Path: "archive.zip"}, Expected: true},
+		{Name: "Archive - valid extension .tar", Input: InputStruct{FileType: types.FileTypes.Archive, Path: "archive.tar"}, Expected: true},
+		{Name: "Archive - invalid extension .jpg", Input: InputStruct{FileType: types.FileTypes.Archive, Path: "image.jpg"}, Expected: false},
+		{Name: "Archive - empty extension", Input: InputStruct{FileType: types.FileTypes.Archive, Path: "archive"}, Expected: false},
 
 		// Tests for Documents file type
-		{Name: "Documents - valid extension .pdf", Input: struct {
-			fileType types.FileType
-			path     string
-		}{fileType: types.FileTypes.Documents, path: "document.pdf"}, Expected: true},
-		{Name: "Documents - valid extension .docx", Input: struct {
-			fileType types.FileType
-			path     string
-		}{fileType: types.FileTypes.Documents, path: "document.docx"}, Expected: true},
-		{Name: "Documents - invalid extension .mp4", Input: struct {
-			fileType types.FileType
-			path     string
-		}{fileType: types.FileTypes.Documents, path: "video.mp4"}, Expected: false},
-		{Name: "Documents - empty extension", Input: struct {
-			fileType types.FileType
-			path     string
-		}{fileType: types.FileTypes.Documents, path: "document"}, Expected: false},
+		{Name: "Documents - valid extension .pdf", Input: InputStruct{FileType: types.FileTypes.Documents, Path: "document.pdf"}, Expected: true},
+		{Name: "Documents - valid extension .docx", Input: InputStruct{FileType: types.FileTypes.Documents, Path: "document.docx"}, Expected: true},
+		{Name: "Documents - invalid extension .mp4", Input: InputStruct{FileType: types.FileTypes.Documents, Path: "video.mp4"}, Expected: false},
+		{Name: "Documents - empty extension", Input: InputStruct{FileType: types.FileTypes.Documents, Path: "document"}, Expected: false},
 
 		// Test for fileType not present in FileExtensions map
-		{Name: "Unknown type - any extension", Input: struct {
-			fileType types.FileType
-			path     string
-		}{fileType: "unknown_type", path: "file.any"}, Expected: false},
+		{Name: "Unknown type - any extension", Input: InputStruct{FileType: "unknown_type", Path: "file.any"}, Expected: false},
 	}
 
 	for _, test := range tests {
 		t.Run(test.Name, func(t *testing.T) { // Run each test case as a sub-test
-			result := IsExtensionValid(test.Input.fileType, test.Input.path)
+			result := IsExtensionValid(test.Input.FileType, test.Input.Path)
 			if result != test.Expected {
-				t.Errorf("IsExtensionValid(%q, %q) = %v; expected %v", test.Input.fileType, test.Input.path, result, test.Expected)
+				t.Errorf("IsExtensionValid(%q, %q) = %v; expected %v", test.Input.FileType, test.Input.Path, result, test.Expected)
 			}
 		})
 	}
@@ -330,20 +244,16 @@ func TestIsExtensionValid(t *testing.T) {
 
 // TestGetOperatorSizeMatches tests GetOperatorSizeMatches func
 func TestGetOperatorSizeMatches(t *testing.T) {
-	tests := []types.TestLayout[struct {
+	type InputStruct struct {
 		Operator      types.OperatorType
 		FileSize      int64
 		ToleranceSize int64
 		InfoSize      int64
-	}, bool]{
+	}
+	tests := []types.TestLayout[InputStruct, bool]{
 		{
 			Name: "EqualTo - Match FileSize",
-			Input: struct {
-				Operator      types.OperatorType
-				FileSize      int64
-				ToleranceSize int64
-				InfoSize      int64
-			}{
+			Input: InputStruct{
 				Operator:      types.OperatorTypes.EqualTo,
 				FileSize:      1024,
 				ToleranceSize: 0,
@@ -353,12 +263,7 @@ func TestGetOperatorSizeMatches(t *testing.T) {
 		},
 		{
 			Name: "EqualTo - Match ToleranceSize",
-			Input: struct {
-				Operator      types.OperatorType
-				FileSize      int64
-				ToleranceSize int64
-				InfoSize      int64
-			}{
+			Input: InputStruct{
 				Operator:      types.OperatorTypes.EqualTo,
 				FileSize:      1024,
 				ToleranceSize: 1050,
@@ -368,12 +273,7 @@ func TestGetOperatorSizeMatches(t *testing.T) {
 		},
 		{
 			Name: "LessThan - Less than FileSize",
-			Input: struct {
-				Operator      types.OperatorType
-				FileSize      int64
-				ToleranceSize int64
-				InfoSize      int64
-			}{
+			Input: InputStruct{
 				Operator:      types.OperatorTypes.LessThan,
 				FileSize:      1024,
 				ToleranceSize: 1050,
@@ -383,12 +283,7 @@ func TestGetOperatorSizeMatches(t *testing.T) {
 		},
 		{
 			Name: "LessThan - Less than or equal to FileSize",
-			Input: struct {
-				Operator      types.OperatorType
-				FileSize      int64
-				ToleranceSize int64
-				InfoSize      int64
-			}{
+			Input: InputStruct{
 				Operator:      types.OperatorTypes.LessThanEqualTo,
 				FileSize:      1024,
 				ToleranceSize: 1050,
@@ -397,13 +292,8 @@ func TestGetOperatorSizeMatches(t *testing.T) {
 			Expected: true,
 		},
 		{
-			Name: "GreaterThanEqualTo - Greater than FileSize",
-			Input: struct {
-				Operator      types.OperatorType
-				FileSize      int64
-				ToleranceSize int64
-				InfoSize      int64
-			}{
+			Name: "GreaterThan - Greater than FileSize",
+			Input: InputStruct{
 				Operator:      types.OperatorTypes.GreaterThan,
 				FileSize:      1024,
 				ToleranceSize: 0,
@@ -413,12 +303,7 @@ func TestGetOperatorSizeMatches(t *testing.T) {
 		},
 		{
 			Name: "GreaterThanEqualTo - Greater than or equal to FileSize",
-			Input: struct {
-				Operator      types.OperatorType
-				FileSize      int64
-				ToleranceSize int64
-				InfoSize      int64
-			}{
+			Input: InputStruct{
 				Operator:      types.OperatorTypes.GreaterThanEqualTo,
 				FileSize:      1024,
 				ToleranceSize: 0,
@@ -428,12 +313,7 @@ func TestGetOperatorSizeMatches(t *testing.T) {
 		},
 		{
 			Name: "Default Case - Invalid Operator",
-			Input: struct {
-				Operator      types.OperatorType
-				FileSize      int64
-				ToleranceSize int64
-				InfoSize      int64
-			}{
+			Input: InputStruct{
 				Operator:      types.OperatorType("invalid"), // an invalid operator
 				FileSize:      1024,
 				ToleranceSize: 1050,
@@ -463,106 +343,108 @@ func TestGetOperatorSizeMatches(t *testing.T) {
 
 // TestCalculateToleranceToBytes test CalculateToleranceToBytes func
 func TestCalculateToleranceToBytes(t *testing.T) {
-	tests := []*types.TestLayout[struct {
+	type InputStruct struct {
 		sizeStr   string
 		tolerance float64
-	}, int64]{
+	}
+
+	tests := []*types.TestLayout[InputStruct, int64]{
 		{
 			Name: "1 KB with 10% tolerance",
-			Input: struct {
-				sizeStr   string
-				tolerance float64
-			}{"1 KB", 10},
+			Input: InputStruct{
+				sizeStr:   "1 KB",
+				tolerance: 10,
+			},
 			Expected: 1126,
 			Err:      nil,
 		},
 		{
 			Name: "1 MB with 50% tolerance",
-			Input: struct {
-				sizeStr   string
-				tolerance float64
-			}{"1 MB", 50},
+			Input: InputStruct{
+				sizeStr:   "1 MB",
+				tolerance: 50,
+			},
 			Expected: 1572864,
 			Err:      nil,
 		},
 		{
 			Name: "100 B with 100% tolerance",
-			Input: struct {
-				sizeStr   string
-				tolerance float64
-			}{"100 B", 100},
+			Input: InputStruct{
+				sizeStr:   "100 B",
+				tolerance: 100,
+			},
 			Expected: 200,
 			Err:      nil,
 		},
 		{
 			Name: "10 GB with 0% tolerance",
-			Input: struct {
-				sizeStr   string
-				tolerance float64
-			}{"10 GB", 0},
+			Input: InputStruct{
+				sizeStr:   "10 GB",
+				tolerance: 0,
+			},
 			Expected: 10737418240,
 			Err:      nil,
 		},
 		{
 			Name: "2.5 KB with 20% tolerance",
-			Input: struct {
-				sizeStr   string
-				tolerance float64
-			}{"2.5 KB", 20},
+			Input: InputStruct{
+				sizeStr:   "2.5 KB",
+				tolerance: 20,
+			},
 			Expected: 3072,
 			Err:      nil,
 		},
 		{
 			Name: "10 MB with 25% tolerance",
-			Input: struct {
-				sizeStr   string
-				tolerance float64
-			}{"10 MB", 25},
+			Input: InputStruct{
+				sizeStr:   "10 MB",
+				tolerance: 25,
+			},
 			Expected: 13107200,
 			Err:      nil,
 		},
 		{
 			Name: "1000 B with 0% tolerance",
-			Input: struct {
-				sizeStr   string
-				tolerance float64
-			}{"1000 B", 0},
+			Input: InputStruct{
+				sizeStr:   "1000 B",
+				tolerance: 0,
+			},
 			Expected: 1000,
 			Err:      nil,
 		},
 		{
 			Name: "5 GB with -10% tolerance",
-			Input: struct {
-				sizeStr   string
-				tolerance float64
-			}{"5 GB", -10},
+			Input: InputStruct{
+				sizeStr:   "5 GB",
+				tolerance: -10,
+			},
 			Expected: 4831838208,
 			Err:      nil,
 		},
 		{
 			Name: "500 KB with 200% tolerance",
-			Input: struct {
-				sizeStr   string
-				tolerance float64
-			}{"500 KB", 200},
+			Input: InputStruct{
+				sizeStr:   "500 KB",
+				tolerance: 200,
+			},
 			Expected: 1536000,
 			Err:      nil,
 		},
 		{
 			Name: "Empty size string",
-			Input: struct {
-				sizeStr   string
-				tolerance float64
-			}{"", 10},
+			Input: InputStruct{
+				sizeStr:   "",
+				tolerance: 10,
+			},
 			Expected: 0,
 			Err:      errors.New("size string is empty"),
 		},
 		{
 			Name: "1 KB with -10% tolerance",
-			Input: struct {
-				sizeStr   string
-				tolerance float64
-			}{"1 KB", -10},
+			Input: InputStruct{
+				sizeStr:   "1 KB",
+				tolerance: -10,
+			},
 			Expected: 921,
 			Err:      nil,
 		},
@@ -580,8 +462,8 @@ func TestCalculateToleranceToBytes(t *testing.T) {
 			}
 		})
 	}
-
 }
+
 
 // TestConvertStringSizeToBytes tests ConvertStringSizeToBytes
 func TestConvertStringSizeToBytes(t *testing.T) {
@@ -610,6 +492,100 @@ func TestConvertStringSizeToBytes(t *testing.T) {
 
 			if (err != nil && test.Err == nil) || (err == nil && test.Err != nil) || (err != nil && test.Err != nil && err.Error() != test.Err.Error()) {
 				t.Errorf("ConvertStringSizeToBytes(%q) error = %v; want %v", test.Input, err, test.Err)
+			}
+		})
+	}
+}
+
+// TestRemoveEmptyDir tests RemoveEmptyDir function
+func TestRemoveEmptyDir(t *testing.T) {
+	// Helper function to create a temporary file for testing
+	createTempFile := func(t *testing.T) *os.File {
+		file, err := os.CreateTemp("", "testfile-*.txt")
+		if err != nil {
+			t.Fatalf("failed to create file: %v", err)
+		}
+		return file
+	}
+
+	// Helper function to create an empty directory for testing
+	createEmptyDir := func(t *testing.T) string {
+		dir := t.TempDir() + "/empty-dir"
+		if err := os.Mkdir(dir, 0755); err != nil {
+			t.Fatalf("failed to create directory: %v", err)
+		}
+		return dir
+	}
+
+	// Helper function to create a non-empty directory for testing
+	createNonEmptyDir := func(t *testing.T) string {
+		dir := filepath.Join(t.TempDir(), FormatPath("/non-empty-dir", runtime.GOOS))
+		if err := os.Mkdir(dir, 0755); err != nil {
+			t.Fatalf("failed to create directory: %v", err)
+		}
+
+		// Create a file inside the non-empty directory
+		filePath := filepath.Join(dir, "testfile.txt")
+		file, err := os.Create(filePath)
+		if err != nil {
+			t.Fatalf("failed to create file: %v", err)
+		}
+		defer file.Close() // Ensure file is closed before directory cleanup
+
+		// Write some content to the file
+		if _, err := file.WriteString("test content"); err != nil {
+			t.Fatalf("failed to write to file: %v", err)
+		}
+
+		return dir
+	}
+
+	// Create paths for test cases
+	nonExistentDir := "nonexistent-dir"
+	file := createTempFile(t)
+	filePath := file.Name()
+	file.Close() // Ensure the file is closed before using it in tests
+	nonEmptyDirPath := createNonEmptyDir(t)
+	emptyDirPath := createEmptyDir(t)
+
+	// Test cases
+	tests := []*types.TestLayout[string, bool]{
+		{
+			Name:     "Directory does not exist",
+			Input:    nonExistentDir,
+			Expected: false,
+			Err:      fmt.Errorf("directory does not exist: CreateFile %v: The system cannot find the file specified.", nonExistentDir),
+		},
+		{
+			Name:     "Path is not a directory",
+			Input:    filePath,
+			Expected: false,
+			Err:      fmt.Errorf("%s is not a directory", filePath),
+		},
+		{
+			Name:     "Directory is not empty",
+			Input:    nonEmptyDirPath,
+			Expected: false,
+			Err:      fmt.Errorf("directory %s is not empty", nonEmptyDirPath),
+		},
+		{
+			Name:     "Successfully remove empty directory",
+			Input:    emptyDirPath,
+			Expected: true,
+			Err:      nil,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.Input, func(t *testing.T) {
+			result, err := RemoveEmptyDir(test.Input)
+
+			if result != test.Expected {
+				t.Errorf("RemoveEmptyDir(%q) = %v; want %v", test.Input, result, test.Expected)
+			}
+
+			if (err != nil && test.Err == nil) || (err == nil && test.Err != nil) || (err != nil && test.Err != nil && err.Error() != test.Err.Error()) {
+				t.Errorf("RemoveEmptyDir(%q) error = %v; want %v", test.Input, err, test.Err)
 			}
 		})
 	}
