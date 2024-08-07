@@ -251,76 +251,13 @@ func TestGetOperatorSizeMatches(t *testing.T) {
 		InfoSize      int64
 	}
 	tests := []types.TestLayout[InputStruct, bool]{
-		{
-			Name: "EqualTo - Match FileSize",
-			Input: InputStruct{
-				Operator:      types.OperatorTypes.EqualTo,
-				FileSize:      1024,
-				ToleranceSize: 0,
-				InfoSize:      1024,
-			},
-			Expected: true,
-		},
-		{
-			Name: "EqualTo - Match ToleranceSize",
-			Input: InputStruct{
-				Operator:      types.OperatorTypes.EqualTo,
-				FileSize:      1024,
-				ToleranceSize: 1050,
-				InfoSize:      1050,
-			},
-			Expected: true,
-		},
-		{
-			Name: "LessThan - Less than FileSize",
-			Input: InputStruct{
-				Operator:      types.OperatorTypes.LessThan,
-				FileSize:      1024,
-				ToleranceSize: 1050,
-				InfoSize:      512,
-			},
-			Expected: true,
-		},
-		{
-			Name: "LessThan - Less than or equal to FileSize",
-			Input: InputStruct{
-				Operator:      types.OperatorTypes.LessThanEqualTo,
-				FileSize:      1024,
-				ToleranceSize: 1050,
-				InfoSize:      512,
-			},
-			Expected: true,
-		},
-		{
-			Name: "GreaterThan - Greater than FileSize",
-			Input: InputStruct{
-				Operator:      types.OperatorTypes.GreaterThan,
-				FileSize:      1024,
-				ToleranceSize: 0,
-				InfoSize:      2048,
-			},
-			Expected: true,
-		},
-		{
-			Name: "GreaterThanEqualTo - Greater than or equal to FileSize",
-			Input: InputStruct{
-				Operator:      types.OperatorTypes.GreaterThanEqualTo,
-				FileSize:      1024,
-				ToleranceSize: 0,
-				InfoSize:      2048,
-			},
-			Expected: true,
-		},
-		{
-			Name: "Default Case - Invalid Operator",
-			Input: InputStruct{
-				Operator:      types.OperatorType("invalid"), // an invalid operator
-				FileSize:      1024,
-				ToleranceSize: 1050,
-				InfoSize:      1024,
-			},
-			Expected: true, // The default case returns true if infoSize equals either fileSize or toleranceSize
-		},
+		{Name: "EqualTo - Match FileSize", Input: InputStruct{Operator: types.OperatorTypes.EqualTo, FileSize: 1024, ToleranceSize: 0, InfoSize: 1024}, Expected: true},
+		{Name: "EqualTo - Match ToleranceSize", Input: InputStruct{Operator: types.OperatorTypes.EqualTo, FileSize: 1024, ToleranceSize: 1050, InfoSize: 1050}, Expected: true},
+		{Name: "LessThan - Less than FileSize", Input: InputStruct{Operator: types.OperatorTypes.LessThan, FileSize: 1024, ToleranceSize: 1050, InfoSize: 512}, Expected: true},
+		{Name: "LessThan - Less than or equal to FileSize", Input: InputStruct{Operator: types.OperatorTypes.LessThanEqualTo, FileSize: 1024, ToleranceSize: 1050, InfoSize: 512}, Expected: true},
+		{Name: "GreaterThan - Greater than FileSize", Input: InputStruct{Operator: types.OperatorTypes.GreaterThan, FileSize: 1024, ToleranceSize: 0, InfoSize: 2048}, Expected: true},
+		{Name: "GreaterThanEqualTo - Greater than or equal to FileSize", Input: InputStruct{Operator: types.OperatorTypes.GreaterThanEqualTo, FileSize: 1024, ToleranceSize: 0, InfoSize: 2048}, Expected: true},
+		{Name: "Default Case - Invalid Operator", Input: InputStruct{Operator: types.OperatorType("invalid"), FileSize: 1024, ToleranceSize: 1050, InfoSize: 1024}, Expected: true},
 	}
 
 	for _, test := range tests {
@@ -349,105 +286,17 @@ func TestCalculateToleranceToBytes(t *testing.T) {
 	}
 
 	tests := []*types.TestLayout[InputStruct, int64]{
-		{
-			Name: "1 KB with 10% tolerance",
-			Input: InputStruct{
-				sizeStr:   "1 KB",
-				tolerance: 10,
-			},
-			Expected: 1126,
-			Err:      nil,
-		},
-		{
-			Name: "1 MB with 50% tolerance",
-			Input: InputStruct{
-				sizeStr:   "1 MB",
-				tolerance: 50,
-			},
-			Expected: 1572864,
-			Err:      nil,
-		},
-		{
-			Name: "100 B with 100% tolerance",
-			Input: InputStruct{
-				sizeStr:   "100 B",
-				tolerance: 100,
-			},
-			Expected: 200,
-			Err:      nil,
-		},
-		{
-			Name: "10 GB with 0% tolerance",
-			Input: InputStruct{
-				sizeStr:   "10 GB",
-				tolerance: 0,
-			},
-			Expected: 10737418240,
-			Err:      nil,
-		},
-		{
-			Name: "2.5 KB with 20% tolerance",
-			Input: InputStruct{
-				sizeStr:   "2.5 KB",
-				tolerance: 20,
-			},
-			Expected: 3072,
-			Err:      nil,
-		},
-		{
-			Name: "10 MB with 25% tolerance",
-			Input: InputStruct{
-				sizeStr:   "10 MB",
-				tolerance: 25,
-			},
-			Expected: 13107200,
-			Err:      nil,
-		},
-		{
-			Name: "1000 B with 0% tolerance",
-			Input: InputStruct{
-				sizeStr:   "1000 B",
-				tolerance: 0,
-			},
-			Expected: 1000,
-			Err:      nil,
-		},
-		{
-			Name: "5 GB with -10% tolerance",
-			Input: InputStruct{
-				sizeStr:   "5 GB",
-				tolerance: -10,
-			},
-			Expected: 4831838208,
-			Err:      nil,
-		},
-		{
-			Name: "500 KB with 200% tolerance",
-			Input: InputStruct{
-				sizeStr:   "500 KB",
-				tolerance: 200,
-			},
-			Expected: 1536000,
-			Err:      nil,
-		},
-		{
-			Name: "Empty size string",
-			Input: InputStruct{
-				sizeStr:   "",
-				tolerance: 10,
-			},
-			Expected: 0,
-			Err:      errors.New("size string is empty"),
-		},
-		{
-			Name: "1 KB with -10% tolerance",
-			Input: InputStruct{
-				sizeStr:   "1 KB",
-				tolerance: -10,
-			},
-			Expected: 921,
-			Err:      nil,
-		},
+		{Name: "1 KB with 10% tolerance", Input: InputStruct{sizeStr: "1 KB", tolerance: 10}, Expected: 1126, Err: nil},
+		{Name: "1 MB with 50% tolerance", Input: InputStruct{sizeStr: "1 MB", tolerance: 50}, Expected: 1572864, Err: nil},
+		{Name: "100 B with 100% tolerance", Input: InputStruct{sizeStr: "100 B", tolerance: 100}, Expected: 200, Err: nil},
+		{Name: "10 GB with 0% tolerance", Input: InputStruct{sizeStr: "10 GB", tolerance: 0}, Expected: 10737418240, Err: nil},
+		{Name: "2.5 KB with 20% tolerance", Input: InputStruct{sizeStr: "2.5 KB", tolerance: 20}, Expected: 3072, Err: nil},
+		{Name: "10 MB with 25% tolerance", Input: InputStruct{sizeStr: "10 MB", tolerance: 25}, Expected: 13107200, Err: nil},
+		{Name: "1000 B with 0% tolerance", Input: InputStruct{sizeStr: "1000 B", tolerance: 0}, Expected: 1000, Err: nil},
+		{Name: "5 GB with -10% tolerance", Input: InputStruct{sizeStr: "5 GB", tolerance: -10}, Expected: 4831838208, Err: nil},
+		{Name: "500 KB with 200% tolerance", Input: InputStruct{sizeStr: "500 KB", tolerance: 200}, Expected: 1536000, Err: nil},
+		{Name: "Empty size string", Input: InputStruct{sizeStr: "", tolerance: 10}, Expected: 0, Err: errors.New("size string is empty")},
+		{Name: "1 KB with -10% tolerance", Input: InputStruct{sizeStr: "1 KB", tolerance: -10}, Expected: 921, Err: nil},
 	}
 
 	for _, test := range tests {
@@ -463,7 +312,6 @@ func TestCalculateToleranceToBytes(t *testing.T) {
 		})
 	}
 }
-
 
 // TestConvertStringSizeToBytes tests ConvertStringSizeToBytes
 func TestConvertStringSizeToBytes(t *testing.T) {
@@ -550,30 +398,10 @@ func TestRemoveEmptyDir(t *testing.T) {
 
 	// Test cases
 	tests := []*types.TestLayout[string, bool]{
-		{
-			Name:     "Directory does not exist",
-			Input:    nonExistentDir,
-			Expected: false,
-			Err:      fmt.Errorf("directory does not exist: CreateFile %v: The system cannot find the file specified.", nonExistentDir),
-		},
-		{
-			Name:     "Path is not a directory",
-			Input:    filePath,
-			Expected: false,
-			Err:      fmt.Errorf("%s is not a directory", filePath),
-		},
-		{
-			Name:     "Directory is not empty",
-			Input:    nonEmptyDirPath,
-			Expected: false,
-			Err:      fmt.Errorf("directory %s is not empty", nonEmptyDirPath),
-		},
-		{
-			Name:     "Successfully remove empty directory",
-			Input:    emptyDirPath,
-			Expected: true,
-			Err:      nil,
-		},
+		{Name: "Directory does not exist", Input: nonExistentDir, Expected: false, Err: fmt.Errorf("directory does not exist: CreateFile %v: The system cannot find the file specified.", nonExistentDir)},
+		{Name: "Path is not a directory", Input: filePath, Expected: false, Err: fmt.Errorf("%s is not a directory", filePath)},
+		{Name: "Directory is not empty", Input: nonEmptyDirPath, Expected: false, Err: fmt.Errorf("directory %s is not empty", nonEmptyDirPath)},
+		{Name: "Successfully remove empty directory", Input: emptyDirPath, Expected: true, Err: nil},
 	}
 
 	for _, test := range tests {
