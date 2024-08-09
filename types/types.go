@@ -1,5 +1,16 @@
 package types
 
+import "os"
+
+// DirOps interfaces
+type DirOps interface {
+	ReadDir(name string) ([]os.DirEntry, error)
+	Remove(name string) error
+}
+
+// RealDirOps
+type RealDirOps struct{}
+
 // FileType
 type FileType string
 
@@ -12,12 +23,27 @@ type SizeUnit struct {
 	Size  int64
 }
 
+// ToleranceResults
+type ToleranceResults struct {
+	ToleranceSize  int64
+	UpperBoundSize int64
+	LowerBoundSize int64
+}
+
 // TestLayout
 type TestLayout[InputT any, ExpectedT any] struct {
 	Name     string
 	Input    InputT
 	Expected ExpectedT
 	Err      error
+}
+
+func (r RealDirOps) ReadDir(name string) ([]os.DirEntry, error) {
+	return os.ReadDir(name)
+}
+
+func (r RealDirOps) Remove(name string) error {
+	return os.Remove(name)
 }
 
 var (
@@ -37,17 +63,17 @@ var (
 	}
 	// OperatorTypes
 	OperatorTypes = struct {
-		EqualTo OperatorType
-		GreaterThan OperatorType
+		EqualTo            OperatorType
+		GreaterThan        OperatorType
 		GreaterThanEqualTo OperatorType
-		LessThan OperatorType
-		LessThanEqualTo OperatorType
+		LessThan           OperatorType
+		LessThanEqualTo    OperatorType
 	}{
-		EqualTo: "Equal To",
-		GreaterThan: "Greater Than",
+		EqualTo:            "Equal To",
+		GreaterThan:        "Greater Than",
 		GreaterThanEqualTo: "Greater Than or Equal To",
-		LessThan: "Less Than",
-		LessThanEqualTo: "Less Than Or Equal To",
+		LessThan:           "Less Than",
+		LessThanEqualTo:    "Less Than Or Equal To",
 	}
 
 	// SizeUnits

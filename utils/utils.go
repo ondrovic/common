@@ -34,6 +34,8 @@ var (
 	ExecCommand = func(name string, arg ...string) CommandExecutor {
 		return &RealCmd{cmd: exec.Command(name, arg...)}
 	}
+
+	osStatFunc = os.Stat
 )
 
 // ClearTerminalScreen clears the terminal based on the provided OS name
@@ -144,40 +146,56 @@ func IsExtensionValid(fileType types.FileType, path string) bool {
 }
 
 // GetOperatorSizeMatches determines whether a file matches the size or falls within the tolerance range.
-func GetOperatorSizeMatches(operator types.OperatorType, wantedFileSize int64, toleranceSize float64, fileSize int64) bool {
-	toleranceBytes := int64(toleranceSize * 1024) // Convert tolerance size in KB to bytes
-	lowerBound := wantedFileSize - toleranceBytes
-	upperBound := wantedFileSize + toleranceBytes
+func GetOperatorSizeMatches(operator types.OperatorType, wantedFileSize int64, toleranceSize float64, fileSize int64) (bool, error) {
+	results, err := CalculateTolerances(wantedFileSize, toleranceSize)
+	if err != nil {
+		return false, fmt.Errorf("error calculating tolerances %v", err)
+	}
 
 	switch operator {
 	case types.OperatorTypes.EqualTo:
-		return fileSize >= lowerBound && fileSize <= upperBound
+		return fileSize >= results.LowerBoundSize && fileSize <= results.UpperBoundSize, nil
 	case types.OperatorTypes.LessThan:
-		return fileSize < wantedFileSize // Changed lowerBound to fileSize
+		return fileSize < wantedFileSize, nil // Changed lowerBound to fileSize
 	case types.OperatorTypes.LessThanEqualTo:
-		return fileSize <= wantedFileSize // Changed upperBound to fileSize
+		return fileSize <= wantedFileSize, nil // Changed upperBound to fileSize
 	case types.OperatorTypes.GreaterThan:
-		return fileSize > wantedFileSize // Changed upperBound to fileSize
+		return fileSize > wantedFileSize, nil // Changed upperBound to fileSize
 	case types.OperatorTypes.GreaterThanEqualTo:
-		return fileSize >= wantedFileSize // Changed lowerBound to fileSize
+		return fileSize >= wantedFileSize, nil // Changed lowerBound to fileSize
 	default:
-		return fileSize >= lowerBound && fileSize <= upperBound
+		return fileSize >= results.LowerBoundSize && fileSize <= results.UpperBoundSize, nil
 	}
 }
 
-// CalculateToleranceToBytes calculates the tolerance size in bytes
-func CalculateToleranceToBytes(sizeStr string, tolerance float64) (int64, error) {
-	fileSize, err := ConvertStringSizeToBytes(sizeStr)
-	if err != nil {
-		return 0, err
-	}
+// CalculateTolerances handles calculating the tolerance threshold based on the wantedFileSize and toleranceSize
+func CalculateTolerances(wantedFileSize int64, toleranceSize float64) (types.ToleranceResults, error) {
+    // Check for invalid input values
+    if wantedFileSize < 0 {
+        return types.ToleranceResults{}, fmt.Errorf("wantedFileSize cannot be negative")
+    }
+    if toleranceSize < 0 {
+        return types.ToleranceResults{}, fmt.Errorf("toleranceSize cannot be negative")
+    }
 
-	toleranceFactor := tolerance / 100.0
-	newSize := float64(fileSize) * (1 + toleranceFactor)
+    // Calculate tolerance in bytes (using int64 directly)
+    toleranceBytes := int64(toleranceSize * 1024)
 
-	nSize := int64(newSize)
+    // Calculate upper and lower bounds
+    upperBoundSize := wantedFileSize + toleranceBytes
+    lowerBoundSize := wantedFileSize - toleranceBytes
 
-	return nSize, nil
+    // Ensure lower bound does not go below zero
+    if lowerBoundSize < 0 {
+        lowerBoundSize = 0
+    }
+
+    // Return the calculated tolerance results
+    return types.ToleranceResults{
+        ToleranceSize:  toleranceBytes,
+        UpperBoundSize: upperBoundSize,
+        LowerBoundSize: lowerBoundSize,
+    }, nil
 }
 
 // ConvertStringSizeToBytes converts a size string with a unit to bytes.
@@ -222,32 +240,38 @@ func ConvertStringSizeToBytes(sizeStr string) (int64, error) {
 	return 0, errors.New("invalid size unit")
 }
 
-// RemoveEmptyDir removes an empty directory and returns true if successful, false otherwise.
-func RemoveEmptyDir(dir string) (bool, error) {
-	// Check if the directory exists
-	info, err := os.Stat(dir)
-	if os.IsNotExist(err) {
-		return false, fmt.Errorf("directory does not exist: %v", err)
-	}
-	if !info.IsDir() {
-		return false, fmt.Errorf("%s is not a directory", dir)
-	}
+// RemoveEmptyDir handles removing of empty directories
+func RemoveEmptyDir(path string, ops types.DirOps) (bool, error) {
+    // Check if the directory exists
+    fileInfo, err := osStatFunc(path)
+    if err != nil {
+        if os.IsNotExist(err) {
+            return false, fmt.Errorf("directory does not exist: %v", err)
+        }
+        return false, err
+    }
 
-	// Check if the directory is empty
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return false, fmt.Errorf("failed to read directory: %v", err)
-	}
+    // Check if it's a directory
+    if !fileInfo.IsDir() {
+        return false, fmt.Errorf("%s is not a directory", path)
+    }
 
-	if len(entries) > 0 {
-		return false, fmt.Errorf("directory %s is not empty", dir)
-	}
+    // Read the directory contents
+    entries, err := ops.ReadDir(path)
+    if err != nil {
+        return false, err
+    }
 
-	// Remove the directory
-	err = os.Remove(dir)
-	if err != nil {
-		return false, fmt.Errorf("failed to remove directory: %v", err)
-	}
+    // Check if the directory is empty
+    if len(entries) > 0 {
+        return false, fmt.Errorf("directory %s is not empty", path)
+    }
 
-	return true, nil
+    // Remove the directory
+    err = ops.Remove(path)
+    if err != nil {
+        return false, err
+    }
+
+    return true, nil
 }

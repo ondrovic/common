@@ -22,6 +22,22 @@ func (m *MockCmd) Run() error {
 	return m.err
 }
 
+type MockDirOps struct {
+	readDirErr error
+	removeErr  error
+}
+
+func (m *MockDirOps) ReadDir(name string) ([]os.DirEntry, error) {
+	if m.readDirErr != nil {
+		return nil, m.readDirErr
+	}
+	return []os.DirEntry{}, nil
+}
+
+func (m *MockDirOps) Remove(name string) error {
+	return m.removeErr
+}
+
 // TestClearTerminalScreen tests the ClearTerminalScreen function
 func TestClearTerminalScreen(t *testing.T) {
 	type ExpectedOutcome struct {
@@ -254,68 +270,73 @@ func TestGetOperatorSizeMatches(t *testing.T) {
 	tests := []*types.TestLayout[InputStruct, bool]{
 		{Name: "EqualTo Match FileSize", Input: InputStruct{Operator: types.OperatorTypes.EqualTo, WantedSize: 1024, ToleranceSize: 0, FileSize: 1024}, Expected: true, Err: nil},
 		{Name: "EqualTo Match Within Tolerance", Input: InputStruct{Operator: types.OperatorTypes.EqualTo, WantedSize: 1024, ToleranceSize: 1.0, FileSize: 1050}, Expected: true, Err: nil},
-		{Name: "LessThan Less than FileSize", Input: InputStruct{Operator: types.OperatorTypes.LessThan, WantedSize: 1024, ToleranceSize: 0, FileSize: 1023}, Expected: true, Err: nil},
-		{Name: "LessThanEqualTo Equal to FileSize", Input: InputStruct{Operator: types.OperatorTypes.LessThanEqualTo, WantedSize: 1024, ToleranceSize: 0, FileSize: 1024}, Expected: true, Err: nil},
-		{Name: "GreaterThan  Greater than FileSize", Input: InputStruct{Operator: types.OperatorTypes.GreaterThan, WantedSize: 1024, ToleranceSize: 0, FileSize: 1025}, Expected: true, Err: nil},
-		{Name: "GreaterThanEqualTo Equal to FileSize", Input: InputStruct{Operator: types.OperatorTypes.GreaterThanEqualTo, WantedSize: 1024, ToleranceSize: 0, FileSize: 1024}, Expected: true, Err: nil},
-		{Name: "Default Case Invalid Operator (behaves like EqualTo)", Input: InputStruct{Operator: types.OperatorType("invalid"), WantedSize: 1024, ToleranceSize: 1.0, FileSize: 1025}, Expected: true, Err: nil},
-		// Additional test cases to cover edge cases
 		{Name: "EqualTo Outside Tolerance (above)", Input: InputStruct{Operator: types.OperatorTypes.EqualTo, WantedSize: 1024, ToleranceSize: 1.0, FileSize: 2049}, Expected: false, Err: nil},
 		{Name: "EqualTo Outside Tolerance (below)", Input: InputStruct{Operator: types.OperatorTypes.EqualTo, WantedSize: 1024, ToleranceSize: 0, FileSize: 0}, Expected: false, Err: nil},
+		{Name: "LessThan Less than FileSize", Input: InputStruct{Operator: types.OperatorTypes.LessThan, WantedSize: 1024, ToleranceSize: 0, FileSize: 1023}, Expected: true, Err: nil},
 		{Name: "LessThan Equal to FileSize", Input: InputStruct{Operator: types.OperatorTypes.LessThan, WantedSize: 1024, ToleranceSize: 0, FileSize: 1024}, Expected: false, Err: nil},
+		{Name: "LessThan Equal to FileSize with Tolerance", Input: InputStruct{Operator: types.OperatorTypes.LessThan, WantedSize: 1024, ToleranceSize: 1.0, FileSize: 1025}, Expected: false, Err: nil},
+		{Name: "LessThan with Tolerance Above", Input: InputStruct{Operator: types.OperatorTypes.LessThan, WantedSize: 1024, ToleranceSize: 1.0, FileSize: 1022}, Expected: true, Err: nil},
+		{Name: "LessThan with Tolerance Below", Input: InputStruct{Operator: types.OperatorTypes.LessThan, WantedSize: 1024, ToleranceSize: 1.0, FileSize: 1026}, Expected: false, Err: nil},
+		{Name: "LessThanEqualTo Equal to FileSize", Input: InputStruct{Operator: types.OperatorTypes.LessThanEqualTo, WantedSize: 1024, ToleranceSize: 0, FileSize: 1024}, Expected: true, Err: nil},
+		{Name: "GreaterThan Greater than FileSize", Input: InputStruct{Operator: types.OperatorTypes.GreaterThan, WantedSize: 1024, ToleranceSize: 0, FileSize: 1025}, Expected: true, Err: nil},
 		{Name: "GreaterThan Equal to FileSize", Input: InputStruct{Operator: types.OperatorTypes.GreaterThan, WantedSize: 1024, ToleranceSize: 0, FileSize: 1024}, Expected: false, Err: nil},
-		// Specific use case 315 KB
+		{Name: "GreaterThanEqualTo Equal to FileSize", Input: InputStruct{Operator: types.OperatorTypes.GreaterThanEqualTo, WantedSize: 1024, ToleranceSize: 0, FileSize: 1024}, Expected: true, Err: nil},
+		{Name: "GreaterThanEqualTo Less than FileSize", Input: InputStruct{Operator: types.OperatorTypes.GreaterThanEqualTo, WantedSize: 1024, ToleranceSize: 0, FileSize: 1023}, Expected: false, Err: nil},
+		{Name: "Default Case Invalid Operator (behaves like EqualTo)", Input: InputStruct{Operator: types.OperatorType("invalid"), WantedSize: 1024, ToleranceSize: 1.0, FileSize: 1025}, Expected: true, Err: nil},
+		// // Specific use case 315 KB
 		{Name: "Equal to FileSize Within Tolerance", Input: InputStruct{Operator: types.OperatorTypes.EqualTo, WantedSize: 315000, ToleranceSize: 0.05, FileSize: 314950}, Expected: true, Err: nil},
+		{Name: "Equal to FileSize Outside Tolerance (above)", Input: InputStruct{Operator: types.OperatorTypes.EqualTo, WantedSize: 315000, ToleranceSize: 0.05, FileSize: 330000}, Expected: false, Err: nil},
+		{Name: "Equal to FileSize Outside Tolerance (below)", Input: InputStruct{Operator: types.OperatorTypes.EqualTo, WantedSize: 315000, ToleranceSize: 0.05, FileSize: 299000}, Expected: false, Err: nil},
+		// Errors
+		{Name: "CalculateTolerances Tolerance Cannot Be Negative", Input: InputStruct{Operator: types.OperatorTypes.EqualTo, WantedSize: 0, ToleranceSize: -1, FileSize: 1024}, Expected: false, Err: fmt.Errorf("error calculating tolerances toleranceSize cannot be negative")},
+		{Name: "CalculateTolerances WantedSize Cannot Be Negative", Input: InputStruct{Operator: types.OperatorTypes.EqualTo, WantedSize: -1, ToleranceSize: 1, FileSize: 1024}, Expected: false, Err: fmt.Errorf("error calculating tolerances wantedFileSize cannot be negative")},
 	}
 
 	for _, test := range tests {
 		t.Run(test.Name, func(t *testing.T) {
-			result := GetOperatorSizeMatches(test.Input.Operator, test.Input.WantedSize, test.Input.ToleranceSize, test.Input.FileSize)
+			result, err := GetOperatorSizeMatches(test.Input.Operator, test.Input.WantedSize, test.Input.ToleranceSize, test.Input.FileSize)
 
 			if result != test.Expected {
-				t.Errorf("GetOperatorSizeMatches(%v, %v, %v, %v) = %v; want %v",
-					test.Input.Operator,
-					test.Input.WantedSize,
-					test.Input.ToleranceSize,
-					test.Input.FileSize,
-					result,
-					test.Expected,
-				)
+				t.Errorf("GetOperatorSizeMatches(%v, %v, %v, %v) = %v; want %v", test.Input.Operator, test.Input.WantedSize, test.Input.ToleranceSize, test.Input.FileSize, result, test.Expected)
+			}
+
+			if (err != nil && test.Err == nil) || (err == nil && test.Err != nil) || (err != nil && test.Err != nil && err.Error() != test.Err.Error()) {
+				t.Errorf("GetOperatorSizeMatches(%v, %v, %v, %v) = %v; want %v", test.Input.Operator, test.Input.WantedSize, test.Input.ToleranceSize, test.Input.FileSize, result, test.Expected)
 			}
 		})
 	}
 }
 
-// TestCalculateToleranceToBytes test CalculateToleranceToBytes func
-func TestCalculateToleranceToBytes(t *testing.T) {
+// TestCalculateTolerances tests the CalculateTolerances function
+func TestCalculateTolerances(t *testing.T) {
 	type InputStruct struct {
-		sizeStr   string
-		tolerance float64
+		wantedFileSize int64
+		toleranceSize  float64
+	}
+	type ExpectedResults struct {
+		results types.ToleranceResults
+		err     error
 	}
 
-	tests := []*types.TestLayout[InputStruct, int64]{
-		{Name: "1 KB with 10% tolerance", Input: InputStruct{sizeStr: "1 KB", tolerance: 10}, Expected: 1126, Err: nil},
-		{Name: "1 MB with 50% tolerance", Input: InputStruct{sizeStr: "1 MB", tolerance: 50}, Expected: 1572864, Err: nil},
-		{Name: "100 B with 100% tolerance", Input: InputStruct{sizeStr: "100 B", tolerance: 100}, Expected: 200, Err: nil},
-		{Name: "10 GB with 0% tolerance", Input: InputStruct{sizeStr: "10 GB", tolerance: 0}, Expected: 10737418240, Err: nil},
-		{Name: "2.5 KB with 20% tolerance", Input: InputStruct{sizeStr: "2.5 KB", tolerance: 20}, Expected: 3072, Err: nil},
-		{Name: "10 MB with 25% tolerance", Input: InputStruct{sizeStr: "10 MB", tolerance: 25}, Expected: 13107200, Err: nil},
-		{Name: "1000 B with 0% tolerance", Input: InputStruct{sizeStr: "1000 B", tolerance: 0}, Expected: 1000, Err: nil},
-		{Name: "5 GB with -10% tolerance", Input: InputStruct{sizeStr: "5 GB", tolerance: -10}, Expected: 4831838208, Err: nil},
-		{Name: "500 KB with 200% tolerance", Input: InputStruct{sizeStr: "500 KB", tolerance: 200}, Expected: 1536000, Err: nil},
-		{Name: "Empty size string", Input: InputStruct{sizeStr: "", tolerance: 10}, Expected: 0, Err: errors.New("size string is empty")},
-		{Name: "1 KB with -10% tolerance", Input: InputStruct{sizeStr: "1 KB", tolerance: -10}, Expected: 921, Err: nil},
+	tests := []*types.TestLayout[InputStruct, ExpectedResults]{
+		{Name: "Basic tolerance calculation", Input: InputStruct{wantedFileSize: 1024, toleranceSize: 10}, Expected: ExpectedResults{results: types.ToleranceResults{ToleranceSize: 10240, UpperBoundSize: 11264, LowerBoundSize: 0}, err: nil}},
+		{Name: "Zero tolerance size", Input: InputStruct{wantedFileSize: 2048, toleranceSize: 0}, Expected: ExpectedResults{results: types.ToleranceResults{ToleranceSize: 0, UpperBoundSize: 2048, LowerBoundSize: 2048}, err: nil}},
+		{Name: "Negative tolerance size", Input: InputStruct{wantedFileSize: 2048, toleranceSize: -5}, Expected: ExpectedResults{results: types.ToleranceResults{ToleranceSize: 0, UpperBoundSize: 0, LowerBoundSize: 0}, err: fmt.Errorf("toleranceSize cannot be negative")}},
+		{Name: "Negative wanted file size", Input: InputStruct{wantedFileSize: -1024, toleranceSize: 10}, Expected: ExpectedResults{results: types.ToleranceResults{ToleranceSize: 0, UpperBoundSize: 0, LowerBoundSize: 0}, err: fmt.Errorf("wantedFileSize cannot be negative")}},
+		{Name: "Negative tolerance size with large wanted file size", Input: InputStruct{wantedFileSize: 10737418240, toleranceSize: -50}, Expected: ExpectedResults{results: types.ToleranceResults{ToleranceSize: 0, UpperBoundSize: 0, LowerBoundSize: 0}, err: fmt.Errorf("toleranceSize cannot be negative")}},
+		{Name: "Lower bound clamped to zero", Input: InputStruct{wantedFileSize: 500, toleranceSize: 600}, Expected: ExpectedResults{results: types.ToleranceResults{ToleranceSize: 614400, UpperBoundSize: 614900, LowerBoundSize: 0}, err: nil}},
 	}
 
 	for _, test := range tests {
 		t.Run(test.Name, func(t *testing.T) {
-			result, err := CalculateToleranceToBytes(test.Input.sizeStr, test.Input.tolerance)
-			if (err != nil) != (test.Err != nil) {
-				t.Errorf("CalculateToleranceToBytes(%v, %v) error = %v; wantErr %v", test.Input.sizeStr, test.Input.tolerance, err, test.Err)
+			result, err := CalculateTolerances(test.Input.wantedFileSize, test.Input.toleranceSize)
+			if (err != nil) != (test.Expected.err != nil) {
+				t.Errorf("CalculateTolerances(%v, %v) error = %v; wantErr %v", test.Input.wantedFileSize, test.Input.toleranceSize, err, test.Expected.err)
 				return
 			}
-			if result != test.Expected {
-				t.Errorf("CalculateToleranceToBytes(%v, %v) = %v; want %v", test.Input.sizeStr, test.Input.tolerance, result, test.Expected)
+
+			if result != test.Expected.results {
+				t.Errorf("CalculateTolerances(%v, %v) = %v; want %v", test.Input.wantedFileSize, test.Input.toleranceSize, result, test.Expected.results)
 			}
 		})
 	}
@@ -324,6 +345,7 @@ func TestCalculateToleranceToBytes(t *testing.T) {
 // TestConvertStringSizeToBytes tests ConvertStringSizeToBytes
 func TestConvertStringSizeToBytes(t *testing.T) {
 	tests := []*types.TestLayout[string, int64]{
+		{Name: "Test Empty Size", Input: " ", Expected: 0, Err: errors.New("size cannot be empty")},
 		{Name: "Test 1 B", Input: "1 B", Expected: 1, Err: nil},
 		{Name: "Test 10 KB", Input: "10 KB", Expected: 10 * 1024, Err: nil},
 		{Name: "Test 1 MB", Input: "1 MB", Expected: 1 * 1024 * 1024, Err: nil},
@@ -366,7 +388,7 @@ func TestRemoveEmptyDir(t *testing.T) {
 
 	// Helper function to create an empty directory for testing
 	createEmptyDir := func(t *testing.T) string {
-		dir := t.TempDir() + "/empty-dir"
+		dir := FormatPath(t.TempDir()+"/empty-dir", runtime.GOOS)
 		if err := os.Mkdir(dir, 0755); err != nil {
 			t.Fatalf("failed to create directory: %v", err)
 		}
@@ -400,28 +422,54 @@ func TestRemoveEmptyDir(t *testing.T) {
 	nonExistentDir := "nonexistent-dir"
 	file := createTempFile(t)
 	filePath := file.Name()
-	file.Close() // Ensure the file is closed before using it in tests
+	file.Close()
 	nonEmptyDirPath := createNonEmptyDir(t)
 	emptyDirPath := createEmptyDir(t)
+	readDirErrorPath := createEmptyDir(t)
+	removeErrorPath := createEmptyDir(t)
+	statErrorPath := filepath.Join(t.TempDir(), "stat-error-dir")
 
 	// Test cases
 	tests := []*types.TestLayout[string, bool]{
-		{Name: "Directory does not exist", Input: nonExistentDir, Expected: false, Err: fmt.Errorf("directory does not exist: CreateFile %v: The system cannot find the file specified.", nonExistentDir)},
-		{Name: "Path is not a directory", Input: filePath, Expected: false, Err: fmt.Errorf("%s is not a directory", filePath)},
-		{Name: "Directory is not empty", Input: nonEmptyDirPath, Expected: false, Err: fmt.Errorf("directory %s is not empty", nonEmptyDirPath)},
+		{Name: "Directory does not exist", Input: nonExistentDir, Expected: false, Err: fmt.Errorf("directory does not exist")},
+		{Name: "Path is not a directory", Input: filePath, Expected: false, Err: fmt.Errorf("is not a directory")},
+		{Name: "Directory is not empty", Input: nonEmptyDirPath, Expected: false, Err: fmt.Errorf("is not empty")},
 		{Name: "Successfully remove empty directory", Input: emptyDirPath, Expected: true, Err: nil},
+		{Name: "ReadDir error", Input: readDirErrorPath, Expected: false, Err: fmt.Errorf("simulated ReadDir error")},
+		{Name: "Remove error", Input: removeErrorPath, Expected: false, Err: fmt.Errorf("simulated Remove error")},
+		{Name: "Stat error", Input: statErrorPath, Expected: false, Err: fmt.Errorf("simulated Stat error")},
 	}
 
 	for _, test := range tests {
-		t.Run(test.Input, func(t *testing.T) {
-			result, err := RemoveEmptyDir(test.Input)
+		t.Run(test.Name, func(t *testing.T) {
+			var ops types.DirOps
+			switch test.Name {
+			case "ReadDir error":
+				ops = &MockDirOps{
+					readDirErr: fmt.Errorf("simulated ReadDir error"),
+				}
+			case "Remove error":
+				ops = &MockDirOps{
+					removeErr: fmt.Errorf("simulated Remove error"),
+				}
+			case "Stat error":
+				originalStatFunc := osStatFunc
+				defer func() { osStatFunc = originalStatFunc }()
+				osStatFunc = func(name string) (os.FileInfo, error) {
+					return nil, fmt.Errorf("simulated Stat error")
+				}
+			default:
+				ops = &types.RealDirOps{}
+			}
+
+			result, err := RemoveEmptyDir(test.Input, ops)
 
 			if result != test.Expected {
 				t.Errorf("RemoveEmptyDir(%q) = %v; want %v", test.Input, result, test.Expected)
 			}
 
-			if (err != nil && test.Err == nil) || (err == nil && test.Err != nil) || (err != nil && test.Err != nil && err.Error() != test.Err.Error()) {
-				t.Errorf("RemoveEmptyDir(%q) error = %v; want %v", test.Input, err, test.Err)
+			if (err != nil && test.Err == nil) || (err == nil && test.Err != nil) || (err != nil && test.Err != nil && !strings.Contains(err.Error(), test.Err.Error())) {
+				t.Errorf("RemoveEmptyDir(%q) error = %v; want error containing %v", test.Input, err, test.Err)
 			}
 		})
 	}
