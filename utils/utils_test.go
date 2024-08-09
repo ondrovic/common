@@ -246,32 +246,38 @@ func TestIsExtensionValid(t *testing.T) {
 func TestGetOperatorSizeMatches(t *testing.T) {
 	type InputStruct struct {
 		Operator      types.OperatorType
-		FileSize      int64
+		WantedSize    int64
 		ToleranceSize float64
-		InfoSize      int64
+		FileSize      int64
 	}
 
 	tests := []*types.TestLayout[InputStruct, bool]{
-		{Name: "EqualTo - Match FileSize", Input: InputStruct{Operator: types.OperatorTypes.EqualTo, FileSize: 1024, ToleranceSize: 0, InfoSize: 1024}, Expected: true, Err: nil},
-		{Name: "EqualTo - Match Within Tolerance", Input: InputStruct{Operator: types.OperatorTypes.EqualTo, FileSize: 1024, ToleranceSize: 1.0, InfoSize: 1050}, Expected: true, Err: nil},
-		{Name: "EqualTo - Match Within Tolerance 315 KB", Input: InputStruct{Operator: types.OperatorTypes.EqualTo, FileSize: 315000, ToleranceSize: 0, InfoSize: 314950}, Expected: true, Err: nil},
-		{Name: "LessThan - Less than FileSize", Input: InputStruct{Operator: types.OperatorTypes.LessThan, FileSize: 1024, ToleranceSize: -0.5, InfoSize: 512}, Expected: true, Err: nil},
-		{Name: "LessThanEqualTo - Less than or equal to FileSize", Input: InputStruct{Operator: types.OperatorTypes.LessThanEqualTo, FileSize: 1024, ToleranceSize: 1.0, InfoSize: 1025}, Expected: true, Err: nil},
-		{Name: "GreaterThan - Greater than Upper Tolerance Bound", Input: InputStruct{Operator: types.OperatorTypes.GreaterThan, FileSize: 1024, ToleranceSize: 1.0, InfoSize: 2048}, Expected: false, Err: nil},
-		{Name: "GreaterThanEqualTo - Greater than or equal to Lower Tolerance Bound", Input: InputStruct{Operator: types.OperatorTypes.GreaterThanEqualTo, FileSize: 1024, ToleranceSize: 1.0, InfoSize: 1023}, Expected: true, Err: nil},
-		{Name: "Default Case - Invalid Operator", Input: InputStruct{Operator: types.OperatorType("invalid"), FileSize: 1024, ToleranceSize: 1.0, InfoSize: 1024}, Expected: true, Err: nil},
+		{Name: "EqualTo Match FileSize", Input: InputStruct{Operator: types.OperatorTypes.EqualTo, WantedSize: 1024, ToleranceSize: 0, FileSize: 1024}, Expected: true, Err: nil},
+		{Name: "EqualTo Match Within Tolerance", Input: InputStruct{Operator: types.OperatorTypes.EqualTo, WantedSize: 1024, ToleranceSize: 1.0, FileSize: 1050}, Expected: true, Err: nil},
+		{Name: "LessThan Less than FileSize", Input: InputStruct{Operator: types.OperatorTypes.LessThan, WantedSize: 1024, ToleranceSize: 0, FileSize: 1023}, Expected: true, Err: nil},
+		{Name: "LessThanEqualTo Equal to FileSize", Input: InputStruct{Operator: types.OperatorTypes.LessThanEqualTo, WantedSize: 1024, ToleranceSize: 0, FileSize: 1024}, Expected: true, Err: nil},
+		{Name: "GreaterThan  Greater than FileSize", Input: InputStruct{Operator: types.OperatorTypes.GreaterThan, WantedSize: 1024, ToleranceSize: 0, FileSize: 1025}, Expected: true, Err: nil},
+		{Name: "GreaterThanEqualTo Equal to FileSize", Input: InputStruct{Operator: types.OperatorTypes.GreaterThanEqualTo, WantedSize: 1024, ToleranceSize: 0, FileSize: 1024}, Expected: true, Err: nil},
+		{Name: "Default Case Invalid Operator (behaves like EqualTo)", Input: InputStruct{Operator: types.OperatorType("invalid"), WantedSize: 1024, ToleranceSize: 1.0, FileSize: 1025}, Expected: true, Err: nil},
+		// Additional test cases to cover edge cases
+		{Name: "EqualTo Outside Tolerance (above)", Input: InputStruct{Operator: types.OperatorTypes.EqualTo, WantedSize: 1024, ToleranceSize: 1.0, FileSize: 2049}, Expected: false, Err: nil},
+		{Name: "EqualTo Outside Tolerance (below)", Input: InputStruct{Operator: types.OperatorTypes.EqualTo, WantedSize: 1024, ToleranceSize: 0, FileSize: 0}, Expected: false, Err: nil},
+		{Name: "LessThan Equal to FileSize", Input: InputStruct{Operator: types.OperatorTypes.LessThan, WantedSize: 1024, ToleranceSize: 0, FileSize: 1024}, Expected: false, Err: nil},
+		{Name: "GreaterThan Equal to FileSize", Input: InputStruct{Operator: types.OperatorTypes.GreaterThan, WantedSize: 1024, ToleranceSize: 0, FileSize: 1024}, Expected: false, Err: nil},
+		// Specific use case 315 KB
+		{Name: "Equal to FileSize Within Tolerance", Input: InputStruct{Operator: types.OperatorTypes.EqualTo, WantedSize: 315000, ToleranceSize: 0.05, FileSize: 314950}, Expected: true, Err: nil},
 	}
 
 	for _, test := range tests {
 		t.Run(test.Name, func(t *testing.T) {
-			result := GetOperatorSizeMatches(test.Input.Operator, test.Input.FileSize, test.Input.ToleranceSize, test.Input.InfoSize)
+			result := GetOperatorSizeMatches(test.Input.Operator, test.Input.WantedSize, test.Input.ToleranceSize, test.Input.FileSize)
 
 			if result != test.Expected {
 				t.Errorf("GetOperatorSizeMatches(%v, %v, %v, %v) = %v; want %v",
 					test.Input.Operator,
-					test.Input.FileSize,
+					test.Input.WantedSize,
 					test.Input.ToleranceSize,
-					test.Input.InfoSize,
+					test.Input.FileSize,
 					result,
 					test.Expected,
 				)

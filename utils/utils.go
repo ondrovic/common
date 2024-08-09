@@ -144,24 +144,24 @@ func IsExtensionValid(fileType types.FileType, path string) bool {
 }
 
 // GetOperatorSizeMatches determines whether a file matches the size or falls within the tolerance range.
-func GetOperatorSizeMatches(operator types.OperatorType, fileSize int64, toleranceSize float64, infoSize int64) bool {
+func GetOperatorSizeMatches(operator types.OperatorType, wantedFileSize int64, toleranceSize float64, fileSize int64) bool {
 	toleranceBytes := int64(toleranceSize * 1024) // Convert tolerance size in KB to bytes
-	lowerBound := fileSize - toleranceBytes
-	upperBound := fileSize + toleranceBytes
+	lowerBound := wantedFileSize - toleranceBytes
+	upperBound := wantedFileSize + toleranceBytes
 
 	switch operator {
 	case types.OperatorTypes.EqualTo:
-		return infoSize >= lowerBound || infoSize <= upperBound
+		return fileSize >= lowerBound && fileSize <= upperBound
 	case types.OperatorTypes.LessThan:
-		return infoSize < lowerBound
+		return fileSize < wantedFileSize // Changed lowerBound to fileSize
 	case types.OperatorTypes.LessThanEqualTo:
-		return infoSize <= upperBound
+		return fileSize <= wantedFileSize // Changed upperBound to fileSize
 	case types.OperatorTypes.GreaterThan:
-		return infoSize > upperBound
+		return fileSize > wantedFileSize // Changed upperBound to fileSize
 	case types.OperatorTypes.GreaterThanEqualTo:
-		return infoSize >= lowerBound
+		return fileSize >= wantedFileSize // Changed lowerBound to fileSize
 	default:
-		return infoSize >= lowerBound || infoSize <= upperBound
+		return fileSize >= lowerBound && fileSize <= upperBound
 	}
 }
 
