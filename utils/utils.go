@@ -84,11 +84,11 @@ func ToOperatorType(operatorType string) types.OperatorType {
 	switch strings.ToLower(operatorType) {
 	case "equal to", "equalto", "equal", "==":
 		return types.OperatorTypes.EqualTo
-	case "greater than", "greaterthan", ">":
+	case "greater", "greater than", "greaterthan", ">":
 		return types.OperatorTypes.GreaterThan
 	case "greater than or equal to", "greaterthanorequalto", ">=":
 		return types.OperatorTypes.GreaterThanEqualTo
-	case "less than", "lessthan", "<":
+	case "less", "less than", "lessthan", "<":
 		return types.OperatorTypes.LessThan
 	case "less than or equal to", "lessthanorequalto", "<=":
 		return types.OperatorTypes.LessThanEqualTo
@@ -143,21 +143,25 @@ func IsExtensionValid(fileType types.FileType, path string) bool {
 	return extensions[ext]
 }
 
-// getOperatorSizeMatches determines whether or not a file matches the size or tolerance size
-func GetOperatorSizeMatches(operator types.OperatorType, fileSize int64, toleranceSize int64, infoSize int64) bool {
+// GetOperatorSizeMatches determines whether a file matches the size or falls within the tolerance range.
+func GetOperatorSizeMatches(operator types.OperatorType, fileSize int64, toleranceSize float64, infoSize int64) bool {
+	toleranceBytes := int64(toleranceSize * 1024) // Convert tolerance size in KB to bytes
+	lowerBound := fileSize - toleranceBytes
+	upperBound := fileSize + toleranceBytes
+
 	switch operator {
 	case types.OperatorTypes.EqualTo:
-		return (infoSize == fileSize || infoSize == toleranceSize)
+		return infoSize >= lowerBound || infoSize <= upperBound
 	case types.OperatorTypes.LessThan:
-		return (infoSize < fileSize || infoSize < toleranceSize)
+		return infoSize < lowerBound
 	case types.OperatorTypes.LessThanEqualTo:
-		return (infoSize <= fileSize || infoSize <= toleranceSize)
+		return infoSize <= upperBound
 	case types.OperatorTypes.GreaterThan:
-		return (infoSize > fileSize || infoSize > toleranceSize)
+		return infoSize > upperBound
 	case types.OperatorTypes.GreaterThanEqualTo:
-		return (infoSize >= fileSize || infoSize >= toleranceSize)
+		return infoSize >= lowerBound
 	default:
-		return (infoSize == fileSize || infoSize == toleranceSize)
+		return infoSize >= lowerBound || infoSize <= upperBound
 	}
 }
 
