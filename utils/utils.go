@@ -84,15 +84,15 @@ func ToFileType(fileType string) types.FileType {
 // ToOperatorType
 func ToOperatorType(operatorType string) types.OperatorType {
 	switch strings.ToLower(operatorType) {
-	case "equal to", "equalto", "equal", "==":
+	case "et", "equal to", "equalto", "equal", "==":
 		return types.OperatorTypes.EqualTo
-	case "greater", "greater than", "greaterthan", ">":
+	case "gt", "greater", "greater than", "greaterthan", ">":
 		return types.OperatorTypes.GreaterThan
-	case "greater than or equal to", "greaterthanorequalto", ">=":
+	case "gte","greater than or equal to", "greaterthanorequalto", ">=":
 		return types.OperatorTypes.GreaterThanEqualTo
-	case "less", "less than", "lessthan", "<":
+	case "lt","less", "less than", "lessthan", "<":
 		return types.OperatorTypes.LessThan
-	case "less than or equal to", "lessthanorequalto", "<=":
+	case "lte","less than or equal to", "lessthanorequalto", "<=":
 		return types.OperatorTypes.LessThanEqualTo
 	default:
 		return ""

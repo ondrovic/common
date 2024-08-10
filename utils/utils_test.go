@@ -123,23 +123,28 @@ func TestToFileType(t *testing.T) {
 // TestToOperatorType tests ToOperatorType func
 func TestToOperatorType(t *testing.T) {
 	tests := []*types.TestLayout[string, types.OperatorType]{
+		{Name: "Test et", Input: "et", Expected: types.OperatorTypes.EqualTo, Err: nil},
 		{Name: "Test equal to", Input: "equal to", Expected: types.OperatorTypes.EqualTo, Err: nil},
 		{Name: `Test equalto`, Input: "equalto", Expected: types.OperatorTypes.EqualTo, Err: nil},
 		{Name: "Test equal", Input: "equal", Expected: types.OperatorTypes.EqualTo, Err: nil},
 		{Name: "Test ==", Input: "==", Expected: types.OperatorTypes.EqualTo, Err: nil},
 
+		{Name: "Test gt", Input: "gt", Expected: types.OperatorTypes.GreaterThan, Err: nil},
 		{Name: "Test greater than", Input: "greater than", Expected: types.OperatorTypes.GreaterThan, Err: nil},
 		{Name: "Test greaterthan", Input: "greaterthan", Expected: types.OperatorTypes.GreaterThan, Err: nil},
 		{Name: "Test >", Input: ">", Expected: types.OperatorTypes.GreaterThan, Err: nil},
 
+		{Name: "Test gte", Input: "gte", Expected: types.OperatorTypes.GreaterThanEqualTo, Err: nil},
 		{Name: "Test greater than or equal to", Input: "greater than or equal to", Expected: types.OperatorTypes.GreaterThanEqualTo, Err: nil},
 		{Name: "Test greaterthanorequalto", Input: "greaterthanorequalto", Expected: types.OperatorTypes.GreaterThanEqualTo, Err: nil},
 		{Name: "Test >=", Input: ">=", Expected: types.OperatorTypes.GreaterThanEqualTo, Err: nil},
 
+		{Name: "Test lt", Input: "lt", Expected: types.OperatorTypes.LessThan, Err: nil},
 		{Name: "Test less than", Input: "less than", Expected: types.OperatorTypes.LessThan, Err: nil},
 		{Name: "Test lessthan", Input: "lessthan", Expected: types.OperatorTypes.LessThan, Err: nil},
 		{Name: "Test <", Input: "<", Expected: types.OperatorTypes.LessThan, Err: nil},
 
+		{Name: "Test lte", Input: "lte", Expected: types.OperatorTypes.LessThanEqualTo, Err: nil},
 		{Name: "Test less than or equal to", Input: "less than or equal to", Expected: types.OperatorTypes.LessThanEqualTo, Err: nil},
 		{Name: "Test lessthanorequalto", Input: "lessthanorequalto", Expected: types.OperatorTypes.LessThanEqualTo, Err: nil},
 		{Name: "Test <=", Input: "<=", Expected: types.OperatorTypes.LessThanEqualTo, Err: nil},
