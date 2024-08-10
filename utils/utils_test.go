@@ -263,6 +263,85 @@ func TestIsExtensionValid(t *testing.T) {
 	}
 }
 
+// TestIsDirectoryEmpty handles testing for IsDirectoryEmpty func
+func TestIsDirectoryEmpty(t *testing.T) {
+	createTempFile := func(t *testing.T) *os.File {
+		file, err := os.CreateTemp("", "testfile-*.txt")
+		if err != nil {
+			t.Fatalf("failed to create file: %v", err)
+		}
+		return file
+	}
+	// Helper function to create an empty directory for testing
+	createEmptyDir := func(t *testing.T) string {
+		dir := FormatPath(t.TempDir()+"/empty-dir", runtime.GOOS)
+		if err := os.Mkdir(dir, 0755); err != nil {
+			t.Fatalf("failed to create directory: %v", err)
+		}
+		return dir
+	}
+
+	// Helper function to create a non-empty directory for testing
+	createNonEmptyDir := func(t *testing.T) string {
+		dir := filepath.Join(t.TempDir(), FormatPath("/non-empty-dir", runtime.GOOS))
+		if err := os.Mkdir(dir, 0755); err != nil {
+			t.Fatalf("failed to create directory: %v", err)
+		}
+
+		// Create a file inside the non-empty directory
+		filePath := filepath.Join(dir, "testfile.txt")
+		file, err := os.Create(filePath)
+		if err != nil {
+			t.Fatalf("failed to create file: %v", err)
+		}
+		defer file.Close() // Ensure file is closed before directory cleanup
+
+		// Write some content to the file
+		if _, err := file.WriteString("test content"); err != nil {
+			t.Fatalf("failed to write to file: %v", err)
+		}
+
+		return dir
+	}
+
+	// fille := createTempFile
+	emptyDir := createEmptyDir(t)
+	nonEmptyDir := createNonEmptyDir(t)
+	file := createTempFile(t)
+	readDirErrorPath := createEmptyDir(t)
+	tests := []*types.TestLayout[string, bool]{
+		{Name: "Test empty directory", Input: emptyDir, Expected: true, Err: nil},
+		{Name: "Test non-empty directory", Input: nonEmptyDir, Expected: false, Err: nil},
+		{Name: "Test non-existing directory", Input: "/path/to/non_existent_dir", Expected: false, Err: fmt.Errorf("The system cannot find the path specified")},
+		{Name: "Test file instead of directory", Input: file.Name(), Expected: false, Err: errors.New("not a directory")},
+		{Name: "Test Dir with read error", Input: readDirErrorPath, Expected: false, Err: fmt.Errorf("simulated ReadDir error")},
+	}
+
+	for _, test := range tests {
+		t.Run(test.Name, func(t *testing.T) {
+			var ops types.DirOps
+			switch test.Name {
+			case "Test Dir with read error":
+				ops = &MockDirOps{
+					readDirErr: fmt.Errorf("simulated ReadDir error"),
+				}
+			default:
+				ops = &types.RealDirOps{}
+			}
+
+			result, err := IsDirectoryEmpty(test.Input, ops)
+
+			if result != test.Expected {
+				t.Errorf("IsDirectoryEmpty(%q) = %v; want %v", test.Input, result, test.Expected)
+			}
+
+			if (err != nil && test.Err == nil) || (err == nil && test.Err != nil) || (err != nil && test.Err != nil && !strings.Contains(err.Error(), test.Err.Error())) {
+				t.Errorf("IsDirectoryEmpty(%q) error = %v; want error containing %v", test.Input, err, test.Err)
+			}
+		})
+	}
+}
+
 // TestGetOperatorSizeMatches tests GetOperatorSizeMatches func
 func TestGetOperatorSizeMatches(t *testing.T) {
 	type InputStruct struct {
@@ -366,7 +445,7 @@ func TestConvertStringSizeToBytes(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		t.Run(test.Input, func(t *testing.T) {
+		t.Run(test.Name, func(t *testing.T) {
 			result, err := ConvertStringSizeToBytes(test.Input)
 
 			if result != test.Expected {
