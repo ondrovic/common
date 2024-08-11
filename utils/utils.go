@@ -13,6 +13,7 @@ import (
 	"unicode"
 
 	"github.com/ondrovic/common/types"
+	"github.com/pterm/pterm"
 )
 
 // CommandExecutor is an interface for executing commands
@@ -38,6 +39,25 @@ var (
 
 	osStatFunc = os.Stat
 )
+
+func AppNameBanner(name string, bgColor pterm.Color, fgColor pterm.Color) error {
+	if name == "" {
+		return fmt.Errorf("name cannot be empty")
+	}
+
+	// Check if bgColor or fgColor are set to their default or invalid values
+	if bgColor == pterm.BgDefault || fgColor == pterm.FgDefault {
+		return fmt.Errorf("both bgColor and fgColor must be set")
+	}
+
+	pterm.DefaultHeader.
+		WithFullWidth().
+		WithBackgroundStyle(pterm.NewStyle(bgColor)).
+		WithTextStyle(pterm.NewStyle(fgColor)).
+		Println(name)
+	
+	return nil
+}
 
 // ClearTerminalScreen clears the terminal based on the provided OS name
 func ClearTerminalScreen(goos string) error {

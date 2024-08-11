@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/ondrovic/common/types"
+	"github.com/pterm/pterm"
 )
 
 // MockCmd is a mock implementation of CommandExecutor for simulating errors
@@ -38,7 +39,39 @@ func (m *MockDirOps) Remove(name string) error {
 	return m.removeErr
 }
 
-// TestClearTerminalScreen tests the ClearTerminalScreen function
+// TestAppNameBanner tests the AppNameBanner func
+func TestAppNameBanner(t *testing.T) {
+	type InputStruct struct {
+		name string
+		bgColor pterm.Color
+		fgColor pterm.Color
+	}
+
+	tests := []*types.TestLayout[InputStruct, error] {
+		{Name: "App Name empty", Input: InputStruct{name: "", bgColor: pterm.BgDefault, fgColor: pterm.FgDefault }, Expected: fmt.Errorf("name cannot be empty"), Err: nil},
+		{Name: "BgColor cannot be default color", Input: InputStruct{name: "test", bgColor: pterm.BgDefault, fgColor: pterm.FgDefault }, Expected: fmt.Errorf("both bgColor and fgColor must be set"), Err: nil},
+		{Name: "FgColor cannot be default color", Input: InputStruct{name: "test", bgColor: pterm.BgDarkGray, fgColor: pterm.FgDefault }, Expected: fmt.Errorf("both bgColor and fgColor must be set"), Err: nil},
+		{Name: "AppNameBanner", Input: InputStruct{name: "test", bgColor: pterm.BgDarkGray, fgColor: pterm.FgLightBlue}, Expected: nil, Err: nil},
+	}
+
+	for _, test := range tests {
+		t.Run(test.Name, func(t *testing.T) {
+			result := AppNameBanner(test.Input.name, test.Input.bgColor, test.Input.fgColor)
+
+			if test.Expected == nil {
+				if result != nil {
+					t.Errorf("AppNameBanner(%q, %v, %v) = %v; expected %v", test.Input.name, test.Input.bgColor, test.Input.fgColor, result, test.Expected)
+				}
+			} else {
+				if result == nil || result.Error() != test.Expected.Error() {
+					t.Errorf("AppNameBanner(%q, %v, %v) = %v; expected %v", test.Input.name, test.Input.bgColor, test.Input.fgColor, result, test.Expected)
+				}
+			}
+		})
+	}
+}
+
+// TestClearTerminalScreen tests the ClearTerminalScreen func
 func TestClearTerminalScreen(t *testing.T) {
 	type ExpectedOutcome struct {
 		shouldFail bool
@@ -272,7 +305,7 @@ func TestIsDirectoryEmpty(t *testing.T) {
 		}
 		return file
 	}
-	// Helper function to create an empty directory for testing
+	// Helper func to create an empty directory for testing
 	createEmptyDir := func(t *testing.T) string {
 		dir := FormatPath(t.TempDir()+"/empty-dir", runtime.GOOS)
 		if err := os.Mkdir(dir, 0755); err != nil {
@@ -281,7 +314,7 @@ func TestIsDirectoryEmpty(t *testing.T) {
 		return dir
 	}
 
-	// Helper function to create a non-empty directory for testing
+	// Helper func to create a non-empty directory for testing
 	createNonEmptyDir := func(t *testing.T) string {
 		dir := filepath.Join(t.TempDir(), FormatPath("/non-empty-dir", runtime.GOOS))
 		if err := os.Mkdir(dir, 0755); err != nil {
@@ -391,7 +424,7 @@ func TestGetOperatorSizeMatches(t *testing.T) {
 	}
 }
 
-// TestCalculateTolerances tests the CalculateTolerances function
+// TestCalculateTolerances tests the CalculateTolerances func
 func TestCalculateTolerances(t *testing.T) {
 	type InputStruct struct {
 		wantedFileSize int64
@@ -492,9 +525,9 @@ func TestPluralize(t *testing.T) {
 	}
 }
 
-// TestRemoveEmptyDir tests RemoveEmptyDir function
+// TestRemoveEmptyDir tests RemoveEmptyDir func
 func TestRemoveEmptyDir(t *testing.T) {
-	// Helper function to create a temporary file for testing
+	// Helper func to create a temporary file for testing
 	createTempFile := func(t *testing.T) *os.File {
 		file, err := os.CreateTemp("", "testfile-*.txt")
 		if err != nil {
@@ -503,7 +536,7 @@ func TestRemoveEmptyDir(t *testing.T) {
 		return file
 	}
 
-	// Helper function to create an empty directory for testing
+	// Helper func to create an empty directory for testing
 	createEmptyDir := func(t *testing.T) string {
 		dir := FormatPath(t.TempDir()+"/empty-dir", runtime.GOOS)
 		if err := os.Mkdir(dir, 0755); err != nil {
@@ -512,7 +545,7 @@ func TestRemoveEmptyDir(t *testing.T) {
 		return dir
 	}
 
-	// Helper function to create a non-empty directory for testing
+	// Helper func to create a non-empty directory for testing
 	createNonEmptyDir := func(t *testing.T) string {
 		dir := filepath.Join(t.TempDir(), FormatPath("/non-empty-dir", runtime.GOOS))
 		if err := os.Mkdir(dir, 0755); err != nil {

@@ -17,6 +17,9 @@ type FileType string
 // OperatorType
 type OperatorType string
 
+// AppName
+type AppName string
+
 // SizeUnit struct for units
 type SizeUnit struct {
 	Label string
