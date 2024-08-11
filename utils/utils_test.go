@@ -459,6 +459,39 @@ func TestConvertStringSizeToBytes(t *testing.T) {
 	}
 }
 
+// TestPluralize tests Pluralize func
+func TestPluralize(t *testing.T) {
+	type InputStruct struct {
+		count    interface{}
+		singular string
+		plural   string
+	}
+
+	tests := []*types.TestLayout[InputStruct, string]{
+		{Name: "Test Negative Count", Input: InputStruct{count: -1, singular: "", plural: ""}, Expected: "", Err: fmt.Errorf("count cannot be negative")},
+		{Name: "Singular cannot be empty", Input: InputStruct{count: 0, singular: "", plural: "wants"}, Expected: "", Err: fmt.Errorf("singular and plural forms cannot be empty")},
+		{Name: "Plural cannot be empty", Input: InputStruct{count: 0, singular: "want", plural: ""}, Expected: "", Err: fmt.Errorf("singular and plural forms cannot be empty")},
+		{Name: "Singular case", Input: InputStruct{count: 1, singular: "want", plural: "wants"}, Expected: "want", Err: nil},
+		{Name: "Plural case", Input: InputStruct{count: 2, singular: "want", plural: "wants"}, Expected: "wants", Err: nil},
+		{Name: "Default case", Input: InputStruct{count: 1.25, singular: "want", plural: "wants"}, Expected: "", Err: fmt.Errorf("count must be an integer")},
+		{Name: "Zero count", Input: InputStruct{count: 0, singular: "want", plural: "wanted"}, Expected: "want", Err: nil},
+	}
+
+	for _, test := range tests {
+		t.Run(test.Name, func(t *testing.T) {
+			result, err := Pluralize(test.Input.count, test.Input.singular, test.Input.plural)
+
+			if result != test.Expected {
+				t.Errorf("Pluralize(%q) = %v; want %v", test.Input, result, test.Expected)
+			}
+
+			if (err != nil && test.Err == nil) || (err == nil && test.Err != nil) || (err != nil && test.Err != nil && err.Error() != test.Err.Error()) {
+				t.Errorf("Pluralize(%q) error = %v; want %v", test.Input, err, test.Err)
+			}
+		})
+	}
+}
+
 // TestRemoveEmptyDir tests RemoveEmptyDir function
 func TestRemoveEmptyDir(t *testing.T) {
 	// Helper function to create a temporary file for testing

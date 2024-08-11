@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"strconv"
 	"strings"
 	"unicode"
@@ -257,6 +258,27 @@ func ConvertStringSizeToBytes(sizeStr string) (int64, error) {
 	}
 
 	return 0, errors.New("invalid size unit")
+}
+
+// Pluralize handles formatting a string between singular and plural cases
+func Pluralize(count interface{}, singular, plural string) (string, error) {
+	// Validate that count is an integer type
+	switch v := reflect.ValueOf(count); v.Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		// Continue with the logic only if count is a valid integer
+		if v.Int() < 0 {
+			return "", errors.New("count cannot be negative")
+		}
+		if singular == "" || plural == "" {
+			return "", errors.New("singular and plural forms cannot be empty")
+		}
+		if v.Int() <= 1 {
+			return singular, nil
+		}
+		return plural, nil
+	default:
+		return "", errors.New("count must be an integer")
+	}
 }
 
 // RemoveEmptyDir handles removing of empty directories
