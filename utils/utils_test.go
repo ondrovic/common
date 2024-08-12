@@ -327,6 +327,28 @@ func TestToOperatorType(t *testing.T) {
 	}
 }
 
+// TestGetVersion tests GetVersion func.
+func TestGetVersion(t *testing.T) {
+	type InputStruct struct {
+		version  string
+		fallback string
+	}
+
+	tests := []*types.TestLayout[InputStruct, string]{
+		{Name: "Empty version returns fallback value", Input: InputStruct{version: "", fallback: "test-ver"}, Expected: "test-ver"},
+		{Name: "Non-empty version ignores fallback, returns version", Input: InputStruct{version: "1.0.0", fallback: "test-ver"}, Expected: "1.0.0"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.Name, func(t *testing.T) { // Run each test case as a sub-test
+			result := GetVersion(test.Input.version, test.Input.fallback)
+			if result != test.Expected {
+				t.Errorf("ToFileType(%q) = %q; expected %q", test.Input, result, test.Expected)
+			}
+		})
+	}
+}
+
 // TestFormatSize tests FormatSize func.
 func TestFormatSize(t *testing.T) {
 	tests := []*types.TestLayout[int64, string]{

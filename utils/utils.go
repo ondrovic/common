@@ -108,26 +108,6 @@ func validateApp(app interface{}) error {
 }
 
 // The function `ApplicationBanner` validates and displays an application banner with specified styles.
-// func ApplicationBanner(app *types.Application) error {
-// 	if err := ClearTerminalScreen(runtime.GOOS); err != nil {
-// 		return err
-// 	}
-
-// 	if err := validateApp(app); err != nil {
-// 		return err
-// 	}
-
-//		pterm.DefaultHeader.
-//			WithFullWidth().
-//			WithBackgroundStyle(
-//				pterm.NewStyle(app.Style.Color.Background),
-//			).
-//			WithTextStyle(
-//				pterm.NewStyle(app.Style.Color.Foreground),
-//			).
-//			Println(app.Name)
-//		return nil
-//	}
 func ApplicationBanner(app *types.Application, clearScreen func(string) error) error {
 	if err := clearScreen(runtime.GOOS); err != nil {
 		return err
@@ -172,6 +152,15 @@ func ClearTerminalScreen(goos string) error {
 	}
 
 	return nil
+}
+
+// The function `GetVersion` is used for setting the version
+func GetVersion(version, fallback string) string {
+	if version == "" {
+		return fallback
+	}
+
+	return version
 }
 
 // The function `ToFileType` converts a string representation of a file type to a corresponding enum
