@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strconv"
 	"strings"
 	"unicode"
@@ -16,50 +17,140 @@ import (
 	"github.com/pterm/pterm"
 )
 
-// CommandExecutor is an interface for executing commands
+// The CommandExecutor interface defines a method Run that executes a command and returns an error.
+// @property {error} Run - The `Run` method is a function defined in the `CommandExecutor` interface.
+// This method is expected to execute a command and return an error if any issues occur during the
+// execution.
 type CommandExecutor interface {
 	Run() error
 }
 
-// RealCmd is a wrapper for exec.Cmd that implements CommandExecutor
+// The RealCmd type represents a command to be executed in Go.
+// @property cmd - The `cmd` property in the `RealCmd` struct is a pointer to an `exec.Cmd` struct.
+// This property is used to store information about a command that can be executed in the operating
+// system.
 type RealCmd struct {
 	cmd *exec.Cmd
 }
 
-// Run executes the command and returns any errors
+// The `func (r *RealCmd) Run() error` method is a method defined on the `RealCmd` struct. This method
+// implements the `Run` function of the `CommandExecutor` interface.
 func (r *RealCmd) Run() error {
 	r.cmd.Stdout = os.Stdout
 	return r.cmd.Run()
 }
 
 var (
+	// The line `ExecCommand = func(name string, arg ...string) CommandExecutor {
+	// 		return &RealCmd{cmd: exec.Command(name, arg...)}
+	// 	}` is defining a variable `ExecCommand` as a function literal. This function takes a `name` string
+	// parameter and a variadic parameter `arg` which is a slice of strings. It returns an instance of the
+	// `RealCmd` struct that implements the `CommandExecutor` interface.
 	ExecCommand = func(name string, arg ...string) CommandExecutor {
 		return &RealCmd{cmd: exec.Command(name, arg...)}
 	}
 
+	// The line `osStatFunc = os.Stat` is creating a variable `osStatFunc` and assigning it the value of
+	// the `os.Stat` function. This is essentially creating an alias for the `os.Stat` function, allowing
+	// it to be referenced by the new variable name `osStatFunc` within the package.
 	osStatFunc = os.Stat
 )
 
-func AppNameBanner(name string, bgColor pterm.Color, fgColor pterm.Color) error {
-	if name == "" {
-		return fmt.Errorf("name cannot be empty")
+// Function to check if a string field is empty.
+func validateStringField(fieldName, value string) error {
+	if value == "" {
+		return fmt.Errorf("%s cannot be empty", fieldName)
+	}
+	return nil
+}
+
+// Function to check if a struct field is empty.
+func validateStructField(fieldName string, value reflect.Value) error {
+	if value.IsZero() {
+		return fmt.Errorf("%s cannot be an empty struct", fieldName)
+	}
+	return nil
+}
+
+// Validate function using reflection.
+func validateApp(app interface{}) error {
+	v := reflect.ValueOf(app)
+
+	// If it's a pointer, dereference it
+	if v.Kind() == reflect.Ptr {
+		v = v.Elem()
 	}
 
-	// Check if bgColor or fgColor are set to their default or invalid values
-	if bgColor == pterm.BgDefault || fgColor == pterm.FgDefault {
-		return fmt.Errorf("both bgColor and fgColor must be set")
+	if v.Kind() != reflect.Struct {
+		return fmt.Errorf("validateApp expects a struct")
+	}
+
+	t := v.Type()
+
+	for i := 0; i < v.NumField(); i++ {
+		field := t.Field(i)
+		value := v.Field(i)
+
+		var err error
+		switch value.Kind() {
+		case reflect.String:
+			err = validateStringField(field.Name, value.String())
+		case reflect.Struct:
+			err = validateStructField(field.Name, value)
+		}
+
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// The function `ApplicationBanner` validates and displays an application banner with specified styles.
+// func ApplicationBanner(app *types.Application) error {
+// 	if err := ClearTerminalScreen(runtime.GOOS); err != nil {
+// 		return err
+// 	}
+
+// 	if err := validateApp(app); err != nil {
+// 		return err
+// 	}
+
+//		pterm.DefaultHeader.
+//			WithFullWidth().
+//			WithBackgroundStyle(
+//				pterm.NewStyle(app.Style.Color.Background),
+//			).
+//			WithTextStyle(
+//				pterm.NewStyle(app.Style.Color.Foreground),
+//			).
+//			Println(app.Name)
+//		return nil
+//	}
+func ApplicationBanner(app *types.Application, clearScreen func(string) error) error {
+	if err := clearScreen(runtime.GOOS); err != nil {
+		return err
+	}
+
+	if err := validateApp(app); err != nil {
+		return err
 	}
 
 	pterm.DefaultHeader.
 		WithFullWidth().
-		WithBackgroundStyle(pterm.NewStyle(bgColor)).
-		WithTextStyle(pterm.NewStyle(fgColor)).
-		Println(name)
-	
+		WithBackgroundStyle(
+			pterm.NewStyle(app.Style.Color.Background),
+		).
+		WithTextStyle(
+			pterm.NewStyle(app.Style.Color.Foreground),
+		).
+		Println(app.Name)
 	return nil
 }
 
-// ClearTerminalScreen clears the terminal based on the provided OS name
+// The function `ClearTerminalScreen` clears the terminal screen based on the operating system provided
+// as an argument.
 func ClearTerminalScreen(goos string) error {
 	var cmd CommandExecutor
 	var err error
@@ -76,15 +167,15 @@ func ClearTerminalScreen(goos string) error {
 	if cmd != nil {
 		err = cmd.Run()
 		if err != nil {
-			// fmt.Printf("failed to clear terminal: %s\n", err)
-			return fmt.Errorf("failed to clear terminal %s", err)
+			return fmt.Errorf("failed to clear terminal %w", err)
 		}
 	}
 
 	return nil
 }
 
-// ToFileType
+// The function `ToFileType` converts a string representation of a file type to a corresponding enum
+// value from the `types.FileType` enum.
 func ToFileType(fileType string) types.FileType {
 	switch strings.ToLower(fileType) {
 	case "any":
@@ -102,7 +193,8 @@ func ToFileType(fileType string) types.FileType {
 	}
 }
 
-// ToOperatorType
+// The function `ToOperatorType` converts a string representation of an operator type to its
+// corresponding enum value.
 func ToOperatorType(operatorType string) types.OperatorType {
 	switch strings.ToLower(operatorType) {
 	case "et", "equal to", "equalto", "equal", "==":
@@ -120,7 +212,8 @@ func ToOperatorType(operatorType string) types.OperatorType {
 	}
 }
 
-// FormatSize formats size to human readable
+// The `FormatSize` function converts a given size in bytes to a human-readable format with appropriate
+// units.
 func FormatSize(bytes int64) string {
 	for _, unit := range types.SizeUnits {
 		if bytes >= unit.Size {
@@ -134,8 +227,9 @@ func FormatSize(bytes int64) string {
 	return "0 B"
 }
 
-// FormatPath formats the path based on the operating system
-func FormatPath(path string, goos string) string {
+// The `FormatPath` function converts file paths to either Windows or Unix style based on the operating
+// system specified.
+func FormatPath(path, goos string) string {
 	switch goos {
 	case "windows":
 		// Convert to Windows style paths (with backslashes)
@@ -149,7 +243,8 @@ func FormatPath(path string, goos string) string {
 	}
 }
 
-// IsExtensionValid checks if the file's extension is allowed for a given file type.
+// The IsExtensionValid function checks if a given file extension is valid for a specified file type
+// based on a predefined list of allowed extensions.
 func IsExtensionValid(fileType types.FileType, path string) bool {
 	ext := strings.ToLower(filepath.Ext(path))
 	extensions, exists := types.FileExtensions[fileType]
@@ -166,7 +261,7 @@ func IsExtensionValid(fileType types.FileType, path string) bool {
 	return extensions[ext]
 }
 
-// IsDirectoryEmpty handles checking if a directory has files or not
+// The function `IsDirectoryEmpty` checks if a directory is empty by listing its entries.
 func IsDirectoryEmpty(path string, ops types.DirOps) (bool, error) {
 	fileInfo, err := osStatFunc(path)
 	if err != nil {
@@ -185,11 +280,12 @@ func IsDirectoryEmpty(path string, ops types.DirOps) (bool, error) {
 	return len(entries) == 0, nil
 }
 
-// GetOperatorSizeMatches determines whether a file matches the size or falls within the tolerance range.
+// The function `GetOperatorSizeMatches` determines if a file size matches a specified operator, wanted
+// file size, and tolerance size.
 func GetOperatorSizeMatches(operator types.OperatorType, wantedFileSize int64, toleranceSize float64, fileSize int64) (bool, error) {
 	results, err := CalculateTolerances(wantedFileSize, toleranceSize)
 	if err != nil {
-		return false, fmt.Errorf("error calculating tolerances %v", err)
+		return false, fmt.Errorf("error calculating tolerances %w", err)
 	}
 
 	switch operator {
@@ -208,7 +304,8 @@ func GetOperatorSizeMatches(operator types.OperatorType, wantedFileSize int64, t
 	}
 }
 
-// CalculateTolerances handles calculating the tolerance threshold based on the wantedFileSize and toleranceSize
+// The CalculateTolerances function calculates upper and lower bounds based on a wanted file size and
+// tolerance size in bytes.
 func CalculateTolerances(wantedFileSize int64, toleranceSize float64) (types.ToleranceResults, error) {
 	// Check for invalid input values
 	if wantedFileSize < 0 {
@@ -238,7 +335,8 @@ func CalculateTolerances(wantedFileSize int64, toleranceSize float64) (types.Tol
 	}, nil
 }
 
-// ConvertStringSizeToBytes converts a size string with a unit to bytes.
+// The function `ConvertStringSizeToBytes` converts a string representation of size with units to
+// bytes.
 func ConvertStringSizeToBytes(sizeStr string) (int64, error) {
 	sizeStr = strings.TrimSpace(sizeStr)
 	if sizeStr == "" {
@@ -280,7 +378,8 @@ func ConvertStringSizeToBytes(sizeStr string) (int64, error) {
 	return 0, errors.New("invalid size unit")
 }
 
-// Pluralize handles formatting a string between singular and plural cases
+// The Pluralize function takes a count and returns the singular or plural form of a word based on the
+// count.
 func Pluralize(count interface{}, singular, plural string) (string, error) {
 	// Validate that count is an integer type
 	switch v := reflect.ValueOf(count); v.Kind() {
@@ -301,13 +400,13 @@ func Pluralize(count interface{}, singular, plural string) (string, error) {
 	}
 }
 
-// RemoveEmptyDir handles removing of empty directories
+// The function `RemoveEmptyDir` checks if a directory is empty and removes it if it is.
 func RemoveEmptyDir(path string, ops types.DirOps) (bool, error) {
 	// Check if the directory exists
 	fileInfo, err := osStatFunc(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return false, fmt.Errorf("directory does not exist: %v", err)
+			return false, fmt.Errorf("directory does not exist: %w", err)
 		}
 		return false, err
 	}

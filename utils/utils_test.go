@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"strings"
 	"testing"
@@ -13,65 +14,195 @@ import (
 	"github.com/pterm/pterm"
 )
 
-// MockCmd is a mock implementation of CommandExecutor for simulating errors
+// The MockCmd type is a struct used for mocking commands in Go code.
+// @property {error} err - The `err` property in the `MockCmd` struct is a field that holds an error
+// value. It can be used to store an error that may occur during the execution of a command or
+// operation.
 type MockCmd struct {
 	err error
 }
 
-// Run simulates command execution by returning the predefined error
+// The above code snippet is defining a method named `Run` for a struct type `MockCmd`. This method
+// takes a pointer receiver `m` of type `MockCmd` and returns an error. Inside the method, it simply
+// returns the error `m.err`. This method is likely intended to simulate running a command and
+// returning an error if any.
 func (m *MockCmd) Run() error {
 	return m.err
 }
 
+// The MockDirOps type is used for mocking directory operations in Go code.
+// @property {error} readDirErr - The `readDirErr` property in the `MockDirOps` struct is used to store
+// an error that may occur when attempting to read a directory. This error could be related to issues
+// such as permission problems, directory not found, or any other error that may occur during the
+// directory reading operation.
+// @property {error} removeErr - The `removeErr` property in the `MockDirOps` struct is used to store
+// an error that may occur when attempting to remove a directory. This error could be related to
+// permissions, file system issues, or any other problem that prevents the directory from being removed
+// successfully.
 type MockDirOps struct {
 	readDirErr error
 	removeErr  error
 }
 
-func (m *MockDirOps) ReadDir(name string) ([]os.DirEntry, error) {
+func (m *MockDirOps) ReadDir(_ string) ([]os.DirEntry, error) {
 	if m.readDirErr != nil {
 		return nil, m.readDirErr
 	}
 	return []os.DirEntry{}, nil
 }
 
-func (m *MockDirOps) Remove(name string) error {
+func (m *MockDirOps) Remove(_ string) error {
 	return m.removeErr
 }
 
-// TestAppNameBanner tests the AppNameBanner func
-func TestAppNameBanner(t *testing.T) {
+// CreateTempFile creates a temporary file for testing.
+func CreateTempFile(t *testing.T) *os.File {
+	t.Helper()
+	file, err := os.CreateTemp("", "testfile-*.txt")
+	if err != nil {
+		t.Fatalf("failed to create file: %v", err)
+	}
+	return file
+}
+
+// CreateEmptyDir creates an empty directory for testing.
+func CreateEmptyDir(t *testing.T) string {
+	t.Helper()
+	dir := FormatPath(filepath.Join(t.TempDir(), "empty-dir"), runtime.GOOS)
+	if err := os.Mkdir(dir, 0o755); err != nil {
+		t.Fatalf("failed to create directory: %v", err)
+	}
+	return dir
+}
+
+// CreateNonEmptyDir creates a non-empty directory for testing.
+func CreateNonEmptyDir(t *testing.T) string {
+	t.Helper()
+	dir := filepath.Join(t.TempDir(), FormatPath("non-empty-dir", runtime.GOOS))
+	if err := os.Mkdir(dir, 0o755); err != nil {
+		t.Fatalf("failed to create directory: %v", err)
+	}
+
+	// Create a file inside the non-empty directory
+	filePath := filepath.Join(dir, "testfile.txt")
+	file, err := os.Create(filePath)
+	if err != nil {
+		t.Fatalf("failed to create file: %v", err)
+	}
+	defer file.Close() // Ensure file is closed before directory cleanup
+
+	// Write some content to the file
+	if _, err := file.WriteString("test content"); err != nil {
+		t.Fatalf("failed to write to file: %v", err)
+	}
+
+	return dir
+}
+
+// TestValidateStringField tests the ValidateStringField func.
+func TestValidateStringField(t *testing.T) {
 	type InputStruct struct {
-		name string
-		bgColor pterm.Color
-		fgColor pterm.Color
+		fieldName string
+		value     string
+	}
+	tests := []*types.TestLayout[InputStruct, error]{
+		{Name: "Empty field", Input: InputStruct{fieldName: "TestField", value: ""}, Expected: fmt.Errorf("TestField cannot be empty")},
+		{Name: "Non-empty field", Input: InputStruct{fieldName: "TestField", value: "value"}},
 	}
 
-	tests := []*types.TestLayout[InputStruct, error] {
-		{Name: "App Name empty", Input: InputStruct{name: "", bgColor: pterm.BgDefault, fgColor: pterm.FgDefault }, Expected: fmt.Errorf("name cannot be empty"), Err: nil},
-		{Name: "BgColor cannot be default color", Input: InputStruct{name: "test", bgColor: pterm.BgDefault, fgColor: pterm.FgDefault }, Expected: fmt.Errorf("both bgColor and fgColor must be set"), Err: nil},
-		{Name: "FgColor cannot be default color", Input: InputStruct{name: "test", bgColor: pterm.BgDarkGray, fgColor: pterm.FgDefault }, Expected: fmt.Errorf("both bgColor and fgColor must be set"), Err: nil},
-		{Name: "AppNameBanner", Input: InputStruct{name: "test", bgColor: pterm.BgDarkGray, fgColor: pterm.FgLightBlue}, Expected: nil, Err: nil},
-	}
-
-	for _, test := range tests {
-		t.Run(test.Name, func(t *testing.T) {
-			result := AppNameBanner(test.Input.name, test.Input.bgColor, test.Input.fgColor)
-
-			if test.Expected == nil {
-				if result != nil {
-					t.Errorf("AppNameBanner(%q, %v, %v) = %v; expected %v", test.Input.name, test.Input.bgColor, test.Input.fgColor, result, test.Expected)
+	for _, tt := range tests {
+		t.Run(tt.Name, func(t *testing.T) {
+			err := validateStringField(tt.Input.fieldName, tt.Input.value)
+			if tt.Expected == nil {
+				if err != nil {
+					t.Errorf("validateStringField() error = %v, expected nil", err)
 				}
 			} else {
-				if result == nil || result.Error() != test.Expected.Error() {
-					t.Errorf("AppNameBanner(%q, %v, %v) = %v; expected %v", test.Input.name, test.Input.bgColor, test.Input.fgColor, result, test.Expected)
+				if err == nil || err.Error() != tt.Expected.Error() {
+					t.Errorf("validateStringField() error = %v, expected %v", err, tt.Expected)
 				}
 			}
 		})
 	}
 }
 
-// TestClearTerminalScreen tests the ClearTerminalScreen func
+// TestValidateStructField tests ValidateStructField func.
+func TestValidateStructField(t *testing.T) {
+	type InputStruct struct {
+		fieldName string
+		value     interface{}
+	}
+	tests := []*types.TestLayout[InputStruct, error]{
+		{Name: "Empty struct", Input: InputStruct{fieldName: "TestStruct", value: struct{}{}}, Expected: fmt.Errorf("TestStruct cannot be an empty struct")},
+		{Name: "Non-empty struct", Input: InputStruct{fieldName: "TestStruct", value: struct{ Field string }{Field: "value"}}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.Name, func(t *testing.T) {
+			err := validateStructField(tt.Input.fieldName, reflect.ValueOf(tt.Input.value))
+			if tt.Expected == nil {
+				if err != nil {
+					t.Errorf("validateStructField() error = %v, expected nil", err)
+				}
+			} else {
+				if err == nil || err.Error() != tt.Expected.Error() {
+					t.Errorf("validateStructField() error = %v, expected %v", err, tt.Expected)
+				}
+			}
+		})
+	}
+}
+
+// TestApplicationBanner tests ApplicationBanner func.
+func TestApplicationBanner(t *testing.T) {
+	type InputStruct struct {
+		app         *types.Application
+		clearScreen func(string) error
+	}
+
+	tests := []*types.TestLayout[InputStruct, error]{
+		{
+			Name: "ClearTerminalScreen error",
+			Input: InputStruct{
+				app: &types.Application{
+					Name:        "Test App",
+					Description: "Test Description",
+					Style:       types.Styles{Color: types.Colors{Background: pterm.BgRed, Foreground: pterm.FgWhite}},
+					Usage:       "Test Usage",
+					Version:     "1.0.0",
+				},
+				clearScreen: func(string) error {
+					return fmt.Errorf("simulated clear screen error")
+				},
+			},
+			Expected: fmt.Errorf("simulated clear screen error"),
+		},
+		{Name: "Application is not a struct", Input: InputStruct{app: nil, clearScreen: ClearTerminalScreen}, Expected: fmt.Errorf("validateApp expects a struct")},
+		{Name: "Empty application name", Input: InputStruct{app: &types.Application{Description: "Test Description", Style: types.Styles{Color: types.Colors{}}, Usage: "Test Usage", Version: "1.0.0"}, clearScreen: ClearTerminalScreen}, Expected: fmt.Errorf("Name cannot be empty")},
+		{Name: "Empty application description", Input: InputStruct{app: &types.Application{Name: "Test App", Style: types.Styles{Color: types.Colors{}}, Usage: "Test Usage", Version: "1.0.0"}, clearScreen: ClearTerminalScreen}, Expected: fmt.Errorf("Description cannot be empty")},
+		{Name: "Empty application style struct", Input: InputStruct{app: &types.Application{Name: "Test App", Description: "Test Description", Style: types.Styles{Color: types.Colors{}}, Usage: "Test Usage", Version: "1.0.0"}, clearScreen: ClearTerminalScreen}, Expected: fmt.Errorf("Style cannot be an empty struct")},
+		{Name: "Empty application usage", Input: InputStruct{app: &types.Application{Name: "Test App", Description: "Test Description", Style: types.Styles{Color: types.Colors{Background: pterm.BgRed, Foreground: pterm.FgWhite}}, Version: "1.0.0"}, clearScreen: ClearTerminalScreen}, Expected: fmt.Errorf("Usage cannot be empty")},
+		{Name: "Empty application version", Input: InputStruct{app: &types.Application{Name: "Test App", Description: "Test Description", Style: types.Styles{Color: types.Colors{Background: pterm.BgRed, Foreground: pterm.FgWhite}}, Usage: "Test Usage"}, clearScreen: ClearTerminalScreen}, Expected: fmt.Errorf("Version cannot be empty")},
+		{Name: "Valid application", Input: InputStruct{app: &types.Application{Name: "Test App", Description: "Test Description", Style: types.Styles{Color: types.Colors{Background: pterm.BgRed, Foreground: pterm.FgWhite}}, Usage: "Test Usage", Version: "1.0.0"}, clearScreen: ClearTerminalScreen}, Expected: nil},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.Name, func(t *testing.T) {
+			err := ApplicationBanner(tt.Input.app, tt.Input.clearScreen)
+			if tt.Expected == nil {
+				if err != nil {
+					t.Errorf("ApplicationBanner() error = %v, expected nil", err)
+				}
+			} else {
+				if err == nil || err.Error() != tt.Expected.Error() {
+					t.Errorf("ApplicationBanner() error = %v, expected %v", err, tt.Expected)
+				}
+			}
+		})
+	}
+}
+
+// TestClearTerminalScreen tests the ClearTerminalScreen func.
 func TestClearTerminalScreen(t *testing.T) {
 	type ExpectedOutcome struct {
 		shouldFail bool
@@ -118,18 +249,19 @@ func TestClearTerminalScreen(t *testing.T) {
 			test.Expected.err = results.err
 
 			err := ClearTerminalScreen(test.Input)
-			if err != nil && test.Expected.err == nil {
+			switch {
+			case err != nil && test.Expected.err == nil:
 				t.Errorf("ClearTerminalScreen(%q) = %v; expected no error", test.Input, err)
-			} else if err == nil && test.Expected.err != nil {
+			case err == nil && test.Expected.err != nil:
 				t.Errorf("ClearTerminalScreen(%q) = no error; expected %v", test.Input, test.Expected.err)
-			} else if err != nil && test.Expected.err != nil && !strings.Contains(err.Error(), test.Expected.err.Error()) {
+			case err != nil && test.Expected.err != nil && !strings.Contains(err.Error(), test.Expected.err.Error()):
 				t.Errorf("ClearTerminalScreen(%q) = %v; expected %v", test.Input, err, test.Expected.err)
 			}
 		})
 	}
 }
 
-// TestToFileType tests ToFileType func
+// TestToFileType tests ToFileType func.
 func TestToFileType(t *testing.T) {
 	tests := []*types.TestLayout[string, types.FileType]{
 		{Name: "Test any type", Input: "any", Expected: types.FileTypes.Any, Err: nil},
@@ -153,7 +285,7 @@ func TestToFileType(t *testing.T) {
 	}
 }
 
-// TestToOperatorType tests ToOperatorType func
+// TestToOperatorType tests ToOperatorType func.
 func TestToOperatorType(t *testing.T) {
 	tests := []*types.TestLayout[string, types.OperatorType]{
 		{Name: "Test et", Input: "et", Expected: types.OperatorTypes.EqualTo, Err: nil},
@@ -195,7 +327,7 @@ func TestToOperatorType(t *testing.T) {
 	}
 }
 
-// TestFormatSize tests FormatSize func
+// TestFormatSize tests FormatSize func.
 func TestFormatSize(t *testing.T) {
 	tests := []*types.TestLayout[int64, string]{
 		{Name: "Test 0 B", Input: 0, Expected: "0 B", Err: nil},
@@ -223,7 +355,7 @@ func TestFormatSize(t *testing.T) {
 	}
 }
 
-// TestFormatPath tests FormatPath func
+// TestFormatPath tests FormatPath func.
 func TestFormatPath(t *testing.T) {
 	type InputStruct struct {
 		Path string
@@ -248,7 +380,7 @@ func TestFormatPath(t *testing.T) {
 	}
 }
 
-// TestIsExtensionValid tests IsExtensionValid func
+// TestIsExtensionValid tests IsExtensionValid func.
 func TestIsExtensionValid(t *testing.T) {
 	type InputStruct struct {
 		FileType types.FileType
@@ -296,52 +428,12 @@ func TestIsExtensionValid(t *testing.T) {
 	}
 }
 
-// TestIsDirectoryEmpty handles testing for IsDirectoryEmpty func
+// TestIsDirectoryEmpty handles testing for IsDirectoryEmpty func.
 func TestIsDirectoryEmpty(t *testing.T) {
-	createTempFile := func(t *testing.T) *os.File {
-		file, err := os.CreateTemp("", "testfile-*.txt")
-		if err != nil {
-			t.Fatalf("failed to create file: %v", err)
-		}
-		return file
-	}
-	// Helper func to create an empty directory for testing
-	createEmptyDir := func(t *testing.T) string {
-		dir := FormatPath(t.TempDir()+"/empty-dir", runtime.GOOS)
-		if err := os.Mkdir(dir, 0755); err != nil {
-			t.Fatalf("failed to create directory: %v", err)
-		}
-		return dir
-	}
-
-	// Helper func to create a non-empty directory for testing
-	createNonEmptyDir := func(t *testing.T) string {
-		dir := filepath.Join(t.TempDir(), FormatPath("/non-empty-dir", runtime.GOOS))
-		if err := os.Mkdir(dir, 0755); err != nil {
-			t.Fatalf("failed to create directory: %v", err)
-		}
-
-		// Create a file inside the non-empty directory
-		filePath := filepath.Join(dir, "testfile.txt")
-		file, err := os.Create(filePath)
-		if err != nil {
-			t.Fatalf("failed to create file: %v", err)
-		}
-		defer file.Close() // Ensure file is closed before directory cleanup
-
-		// Write some content to the file
-		if _, err := file.WriteString("test content"); err != nil {
-			t.Fatalf("failed to write to file: %v", err)
-		}
-
-		return dir
-	}
-
-	// fille := createTempFile
-	emptyDir := createEmptyDir(t)
-	nonEmptyDir := createNonEmptyDir(t)
-	file := createTempFile(t)
-	readDirErrorPath := createEmptyDir(t)
+	emptyDir := CreateEmptyDir(t)
+	nonEmptyDir := CreateNonEmptyDir(t)
+	file := CreateTempFile(t)
+	readDirErrorPath := CreateEmptyDir(t)
 	tests := []*types.TestLayout[string, bool]{
 		{Name: "Test empty directory", Input: emptyDir, Expected: true, Err: nil},
 		{Name: "Test non-empty directory", Input: nonEmptyDir, Expected: false, Err: nil},
@@ -375,7 +467,7 @@ func TestIsDirectoryEmpty(t *testing.T) {
 	}
 }
 
-// TestGetOperatorSizeMatches tests GetOperatorSizeMatches func
+// TestGetOperatorSizeMatches tests GetOperatorSizeMatches func.
 func TestGetOperatorSizeMatches(t *testing.T) {
 	type InputStruct struct {
 		Operator      types.OperatorType
@@ -424,7 +516,7 @@ func TestGetOperatorSizeMatches(t *testing.T) {
 	}
 }
 
-// TestCalculateTolerances tests the CalculateTolerances func
+// TestCalculateTolerances tests the CalculateTolerances func.
 func TestCalculateTolerances(t *testing.T) {
 	type InputStruct struct {
 		wantedFileSize int64
@@ -459,7 +551,7 @@ func TestCalculateTolerances(t *testing.T) {
 	}
 }
 
-// TestConvertStringSizeToBytes tests ConvertStringSizeToBytes
+// TestConvertStringSizeToBytes tests ConvertStringSizeToBytes.
 func TestConvertStringSizeToBytes(t *testing.T) {
 	tests := []*types.TestLayout[string, int64]{
 		{Name: "Test Empty Size", Input: " ", Expected: 0, Err: errors.New("size cannot be empty")},
@@ -492,7 +584,7 @@ func TestConvertStringSizeToBytes(t *testing.T) {
 	}
 }
 
-// TestPluralize tests Pluralize func
+// TestPluralize tests Pluralize func.
 func TestPluralize(t *testing.T) {
 	type InputStruct struct {
 		count    interface{}
@@ -525,58 +617,17 @@ func TestPluralize(t *testing.T) {
 	}
 }
 
-// TestRemoveEmptyDir tests RemoveEmptyDir func
+// TestRemoveEmptyDir tests RemoveEmptyDir func.
 func TestRemoveEmptyDir(t *testing.T) {
-	// Helper func to create a temporary file for testing
-	createTempFile := func(t *testing.T) *os.File {
-		file, err := os.CreateTemp("", "testfile-*.txt")
-		if err != nil {
-			t.Fatalf("failed to create file: %v", err)
-		}
-		return file
-	}
-
-	// Helper func to create an empty directory for testing
-	createEmptyDir := func(t *testing.T) string {
-		dir := FormatPath(t.TempDir()+"/empty-dir", runtime.GOOS)
-		if err := os.Mkdir(dir, 0755); err != nil {
-			t.Fatalf("failed to create directory: %v", err)
-		}
-		return dir
-	}
-
-	// Helper func to create a non-empty directory for testing
-	createNonEmptyDir := func(t *testing.T) string {
-		dir := filepath.Join(t.TempDir(), FormatPath("/non-empty-dir", runtime.GOOS))
-		if err := os.Mkdir(dir, 0755); err != nil {
-			t.Fatalf("failed to create directory: %v", err)
-		}
-
-		// Create a file inside the non-empty directory
-		filePath := filepath.Join(dir, "testfile.txt")
-		file, err := os.Create(filePath)
-		if err != nil {
-			t.Fatalf("failed to create file: %v", err)
-		}
-		defer file.Close() // Ensure file is closed before directory cleanup
-
-		// Write some content to the file
-		if _, err := file.WriteString("test content"); err != nil {
-			t.Fatalf("failed to write to file: %v", err)
-		}
-
-		return dir
-	}
-
 	// Create paths for test cases
 	nonExistentDir := "nonexistent-dir"
-	file := createTempFile(t)
+	file := CreateTempFile(t)
 	filePath := file.Name()
 	file.Close()
-	nonEmptyDirPath := createNonEmptyDir(t)
-	emptyDirPath := createEmptyDir(t)
-	readDirErrorPath := createEmptyDir(t)
-	removeErrorPath := createEmptyDir(t)
+	nonEmptyDirPath := CreateNonEmptyDir(t)
+	emptyDirPath := CreateEmptyDir(t)
+	readDirErrorPath := CreateEmptyDir(t)
+	removeErrorPath := CreateEmptyDir(t)
 	statErrorPath := filepath.Join(t.TempDir(), "stat-error-dir")
 
 	// Test cases
@@ -605,7 +656,7 @@ func TestRemoveEmptyDir(t *testing.T) {
 			case "Stat error":
 				originalStatFunc := osStatFunc
 				defer func() { osStatFunc = originalStatFunc }()
-				osStatFunc = func(name string) (os.FileInfo, error) {
+				osStatFunc = func(_ string) (os.FileInfo, error) {
 					return nil, fmt.Errorf("simulated Stat error")
 				}
 			default:
