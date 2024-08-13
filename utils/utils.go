@@ -15,6 +15,7 @@ import (
 
 	"github.com/ondrovic/common/types"
 	"github.com/pterm/pterm"
+	"github.com/spf13/cobra"
 )
 
 // The CommandExecutor interface defines a method Run that executes a command and returns an error.
@@ -154,13 +155,28 @@ func ClearTerminalScreen(goos string) error {
 	return nil
 }
 
-// The function `GetVersion` is used for setting the version
+// The function `GetVersion` is used for setting the version.
 func GetVersion(version, fallback string) string {
 	if version == "" {
 		return fallback
 	}
 
 	return version
+}
+
+// The function `HandleCliFlags` is used to handle cobra cli flags.
+func HandleCliFlags(cmd *cobra.Command) (bool, error) {
+	if len(os.Args) > 1 {
+		switch os.Args[1] {
+		case "-h", "--help":
+			err := cmd.Help()
+			return true, err
+		case "-v", "--version":
+			pterm.Println(cmd.Version)
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // The function `ToFileType` converts a string representation of a file type to a corresponding enum

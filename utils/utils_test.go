@@ -12,6 +12,7 @@ import (
 
 	"github.com/ondrovic/common/types"
 	"github.com/pterm/pterm"
+	"github.com/spf13/cobra"
 )
 
 // The MockCmd type is a struct used for mocking commands in Go code.
@@ -32,11 +33,11 @@ func (m *MockCmd) Run() error {
 
 // The MockDirOps type is used for mocking directory operations in Go code.
 // @property {error} readDirErr - The `readDirErr` property in the `MockDirOps` struct is used to store
-// an error that may occur when attempting to read a directory. This error could be related to issues
+// an error that may occur when atestempting to read a directory. This error could be related to issues
 // such as permission problems, directory not found, or any other error that may occur during the
 // directory reading operation.
 // @property {error} removeErr - The `removeErr` property in the `MockDirOps` struct is used to store
-// an error that may occur when attempting to remove a directory. This error could be related to
+// an error that may occur when atestempting to remove a directory. This error could be related to
 // permissions, file system issues, or any other problem that prevents the directory from being removed
 // successfully.
 type MockDirOps struct {
@@ -110,16 +111,16 @@ func TestValidateStringField(t *testing.T) {
 		{Name: "Non-empty field", Input: InputStruct{fieldName: "TestField", value: "value"}},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.Name, func(t *testing.T) {
-			err := validateStringField(tt.Input.fieldName, tt.Input.value)
-			if tt.Expected == nil {
+	for _, test := range tests {
+		t.Run(test.Name, func(t *testing.T) {
+			err := validateStringField(test.Input.fieldName, test.Input.value)
+			if test.Expected == nil {
 				if err != nil {
-					t.Errorf("validateStringField() error = %v, expected nil", err)
+					t.Errorf("validateStringField() - %v error = %v, expected nil", test.Name, err)
 				}
 			} else {
-				if err == nil || err.Error() != tt.Expected.Error() {
-					t.Errorf("validateStringField() error = %v, expected %v", err, tt.Expected)
+				if err == nil || err.Error() != test.Expected.Error() {
+					t.Errorf("validateStringField() - %v error = %v, expected %v", test.Name, err, test.Expected)
 				}
 			}
 		})
@@ -137,16 +138,16 @@ func TestValidateStructField(t *testing.T) {
 		{Name: "Non-empty struct", Input: InputStruct{fieldName: "TestStruct", value: struct{ Field string }{Field: "value"}}},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.Name, func(t *testing.T) {
-			err := validateStructField(tt.Input.fieldName, reflect.ValueOf(tt.Input.value))
-			if tt.Expected == nil {
+	for _, test := range tests {
+		t.Run(test.Name, func(t *testing.T) {
+			err := validateStructField(test.Input.fieldName, reflect.ValueOf(test.Input.value))
+			if test.Expected == nil {
 				if err != nil {
-					t.Errorf("validateStructField() error = %v, expected nil", err)
+					t.Errorf("validateStructField() - %v error = %v, expected nil", test.Name, err)
 				}
 			} else {
-				if err == nil || err.Error() != tt.Expected.Error() {
-					t.Errorf("validateStructField() error = %v, expected %v", err, tt.Expected)
+				if err == nil || err.Error() != test.Expected.Error() {
+					t.Errorf("validateStructField() - %v error = %v, expected %v", test.Name, err, test.Expected)
 				}
 			}
 		})
@@ -186,16 +187,16 @@ func TestApplicationBanner(t *testing.T) {
 		{Name: "Valid application", Input: InputStruct{app: &types.Application{Name: "Test App", Description: "Test Description", Style: types.Styles{Color: types.Colors{Background: pterm.BgRed, Foreground: pterm.FgWhite}}, Usage: "Test Usage", Version: "1.0.0"}, clearScreen: ClearTerminalScreen}, Expected: nil},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.Name, func(t *testing.T) {
-			err := ApplicationBanner(tt.Input.app, tt.Input.clearScreen)
-			if tt.Expected == nil {
+	for _, test := range tests {
+		t.Run(test.Name, func(t *testing.T) {
+			err := ApplicationBanner(test.Input.app, test.Input.clearScreen)
+			if test.Expected == nil {
 				if err != nil {
-					t.Errorf("ApplicationBanner() error = %v, expected nil", err)
+					t.Errorf("ApplicationBanner() - %v error = %v, expected nil", test.Name, err)
 				}
 			} else {
-				if err == nil || err.Error() != tt.Expected.Error() {
-					t.Errorf("ApplicationBanner() error = %v, expected %v", err, tt.Expected)
+				if err == nil || err.Error() != test.Expected.Error() {
+					t.Errorf("ApplicationBanner() - %v error = %v, expected %v", test.Name, err, test.Expected)
 				}
 			}
 		})
@@ -251,11 +252,11 @@ func TestClearTerminalScreen(t *testing.T) {
 			err := ClearTerminalScreen(test.Input)
 			switch {
 			case err != nil && test.Expected.err == nil:
-				t.Errorf("ClearTerminalScreen(%q) = %v; expected no error", test.Input, err)
+				t.Errorf("ClearTerminalScreen() - %v(%q) = %v; expected no error", test.Name, test.Input, err)
 			case err == nil && test.Expected.err != nil:
-				t.Errorf("ClearTerminalScreen(%q) = no error; expected %v", test.Input, test.Expected.err)
+				t.Errorf("ClearTerminalScreen() - %v(%q) = no error; expected %v", test.Name, test.Input, test.Expected.err)
 			case err != nil && test.Expected.err != nil && !strings.Contains(err.Error(), test.Expected.err.Error()):
-				t.Errorf("ClearTerminalScreen(%q) = %v; expected %v", test.Input, err, test.Expected.err)
+				t.Errorf("ClearTerminalScreen() - %v(%q) = %v; expected %v", test.Name, test.Input, err, test.Expected.err)
 			}
 		})
 	}
@@ -279,7 +280,7 @@ func TestToFileType(t *testing.T) {
 		t.Run(test.Name, func(t *testing.T) { // Run each test case as a sub-test
 			result := ToFileType(test.Input)
 			if result != test.Expected {
-				t.Errorf("ToFileType(%q) = %q; expected %q", test.Input, result, test.Expected)
+				t.Errorf("TestToFileType() - %v(%q) = %q; expected %q", test.Name, test.Input, result, test.Expected)
 			}
 		})
 	}
@@ -321,7 +322,7 @@ func TestToOperatorType(t *testing.T) {
 		t.Run(test.Name, func(t *testing.T) { // Run each test case as a sub-test
 			result := ToOperatorType(test.Input)
 			if result != test.Expected {
-				t.Errorf("ToFileType(%q) = %q; expected %q", test.Input, result, test.Expected)
+				t.Errorf("ToOperatorType() - %v(%q) = %q; expected %q", test.Name, test.Input, result, test.Expected)
 			}
 		})
 	}
@@ -343,7 +344,48 @@ func TestGetVersion(t *testing.T) {
 		t.Run(test.Name, func(t *testing.T) { // Run each test case as a sub-test
 			result := GetVersion(test.Input.version, test.Input.fallback)
 			if result != test.Expected {
-				t.Errorf("ToFileType(%q) = %q; expected %q", test.Input, result, test.Expected)
+				t.Errorf("GetVersion() - %v(%q) = %q; expected %q", test.Name, test.Input, result, test.Expected)
+			}
+		})
+	}
+}
+
+// TestHandleCliFlags tests HandleCliFlags func.
+func TestHandleCliFlags(t *testing.T) {
+	type ExpectedOutcome struct {
+		result bool
+		err    error
+	}
+	tests := []*types.TestLayout[string, ExpectedOutcome]{
+		{Name: "Help flag -h", Input: "-h", Expected: ExpectedOutcome{result: true, err: nil}},
+		{Name: "Help flag --help", Input: "--help", Expected: ExpectedOutcome{result: true, err: nil}},
+		{Name: "Version flag -v", Input: "-v", Expected: ExpectedOutcome{result: true, err: nil}},
+		{Name: "Version flag --version", Input: "--version", Expected: ExpectedOutcome{result: true, err: nil}},
+		{Name: "Any other flag", Input: "-o", Expected: ExpectedOutcome{result: false, err: nil}},
+	}
+
+	for _, test := range tests {
+		t.Run(test.Name, func(t *testing.T) {
+			// Save and restore os.Args
+			oldArgs := os.Args
+			defer func() { os.Args = oldArgs }()
+
+			// Set up test args
+			os.Args = []string{"program", test.Input}
+
+			// Create a mock cobra.Command
+			cmd := &cobra.Command{
+				Use: "test",
+			}
+
+			result, err := HandleCliFlags(cmd)
+
+			if result != test.Expected.result {
+				t.Errorf("HandleCliFlags() - %v(%q) result = %v; expected %v", test.Name, test.Input, result, test.Expected.result)
+			}
+
+			if (err == nil && test.Expected.err != nil) || (err != nil && test.Expected.err == nil) || (err != nil && err.Error() == test.Expected.err.Error()) {
+				t.Errorf("HandleCliFlags() - %v(%q) error = %c; expected %v", test.Name, test.Input, err, test.Expected.err)
 			}
 		})
 	}
@@ -371,7 +413,7 @@ func TestFormatSize(t *testing.T) {
 		t.Run(test.Name, func(t *testing.T) { // Run each test case as a sub-test
 			result := FormatSize(test.Input)
 			if result != test.Expected {
-				t.Errorf("ToFileType(%q) = %q; expected %q", test.Input, result, test.Expected)
+				t.Errorf("FormatSize(%q) - %v = %q; expected %q", test.Input, test.Name, result, test.Expected)
 			}
 		})
 	}
@@ -384,9 +426,9 @@ func TestFormatPath(t *testing.T) {
 		GOOS string
 	}
 	tests := []*types.TestLayout[InputStruct, string]{
-		{Name: "Test Windows path formatting", Input: InputStruct{Path: `C:\path\to\file`, GOOS: "windows"}, Expected: `C:\path\to\file`, Err: nil},
-		{Name: "Test Linux path formatting", Input: InputStruct{Path: `\path\to\file`, GOOS: "linux"}, Expected: `/path/to/file`, Err: nil},
-		{Name: "Test macOS path formatting", Input: InputStruct{Path: `/path/to/file`, GOOS: "darwin"}, Expected: `/path/to/file`, Err: nil},
+		{Name: "Test Windows path formatesting", Input: InputStruct{Path: `C:\path\to\file`, GOOS: "windows"}, Expected: `C:\path\to\file`, Err: nil},
+		{Name: "Test Linux path formatesting", Input: InputStruct{Path: `\path\to\file`, GOOS: "linux"}, Expected: `/path/to/file`, Err: nil},
+		{Name: "Test macOS path formatesting", Input: InputStruct{Path: `/path/to/file`, GOOS: "darwin"}, Expected: `/path/to/file`, Err: nil},
 		{Name: "Test default case for Unix", Input: InputStruct{Path: `/path/to/file`, GOOS: "unknown"}, Expected: `/path/to/file`, Err: nil},
 		{Name: "Test Windows path with forward slashes", Input: InputStruct{Path: `C:/path/to/file`, GOOS: "windows"}, Expected: `C:\path\to\file`, Err: nil},
 		{Name: "Test Unix path with backslashes", Input: InputStruct{Path: `\path\to\file`, GOOS: "linux"}, Expected: `/path/to/file`, Err: nil},
@@ -396,7 +438,7 @@ func TestFormatPath(t *testing.T) {
 		t.Run(test.Name, func(t *testing.T) { // Run each test case as a sub-test
 			result := FormatPath(test.Input.Path, test.Input.GOOS)
 			if result != test.Expected {
-				t.Errorf("FormatPath(%q, %q) = %q; expected %q", test.Input.Path, test.Input.GOOS, result, test.Expected)
+				t.Errorf("FormatPath(%q, %q) - %v = %q; expected %q", test.Input.Path, test.Input.GOOS, test.Name, result, test.Expected)
 			}
 		})
 	}
@@ -444,7 +486,7 @@ func TestIsExtensionValid(t *testing.T) {
 		t.Run(test.Name, func(t *testing.T) { // Run each test case as a sub-test
 			result := IsExtensionValid(test.Input.FileType, test.Input.Path)
 			if result != test.Expected {
-				t.Errorf("IsExtensionValid(%q, %q) = %v; expected %v", test.Input.FileType, test.Input.Path, result, test.Expected)
+				t.Errorf("IsExtensionValid(%q, %q) - %v  = %v; expected %v", test.Input.FileType, test.Input.Path, test.Name, result, test.Expected)
 			}
 		})
 	}
@@ -479,11 +521,11 @@ func TestIsDirectoryEmpty(t *testing.T) {
 			result, err := IsDirectoryEmpty(test.Input, ops)
 
 			if result != test.Expected {
-				t.Errorf("IsDirectoryEmpty(%q) = %v; want %v", test.Input, result, test.Expected)
+				t.Errorf("IsDirectoryEmpty(%q) - %v = %v; want %v", test.Input, test.Name, result, test.Expected)
 			}
 
 			if (err != nil && test.Err == nil) || (err == nil && test.Err != nil) || (err != nil && test.Err != nil && !strings.Contains(err.Error(), test.Err.Error())) {
-				t.Errorf("IsDirectoryEmpty(%q) error = %v; want error containing %v", test.Input, err, test.Err)
+				t.Errorf("IsDirectoryEmpty(%q) - %v error = %v; want error containing %v", test.Input, test.Name, err, test.Err)
 			}
 		})
 	}
@@ -528,11 +570,11 @@ func TestGetOperatorSizeMatches(t *testing.T) {
 			result, err := GetOperatorSizeMatches(test.Input.Operator, test.Input.WantedSize, test.Input.ToleranceSize, test.Input.FileSize)
 
 			if result != test.Expected {
-				t.Errorf("GetOperatorSizeMatches(%v, %v, %v, %v) = %v; want %v", test.Input.Operator, test.Input.WantedSize, test.Input.ToleranceSize, test.Input.FileSize, result, test.Expected)
+				t.Errorf("GetOperatorSizeMatches(%v, %v, %v, %v) - %v = %v; want %v", test.Input.Operator, test.Input.WantedSize, test.Input.ToleranceSize, test.Input.FileSize, test.Name, result, test.Expected)
 			}
 
 			if (err != nil && test.Err == nil) || (err == nil && test.Err != nil) || (err != nil && test.Err != nil && err.Error() != test.Err.Error()) {
-				t.Errorf("GetOperatorSizeMatches(%v, %v, %v, %v) = %v; want %v", test.Input.Operator, test.Input.WantedSize, test.Input.ToleranceSize, test.Input.FileSize, result, test.Expected)
+				t.Errorf("GetOperatorSizeMatches(%v, %v, %v, %v) - %v = %v; want %v", test.Input.Operator, test.Input.WantedSize, test.Input.ToleranceSize, test.Input.FileSize, test.Name, result, test.Expected)
 			}
 		})
 	}
@@ -562,12 +604,12 @@ func TestCalculateTolerances(t *testing.T) {
 		t.Run(test.Name, func(t *testing.T) {
 			result, err := CalculateTolerances(test.Input.wantedFileSize, test.Input.toleranceSize)
 			if (err != nil) != (test.Expected.err != nil) {
-				t.Errorf("CalculateTolerances(%v, %v) error = %v; wantErr %v", test.Input.wantedFileSize, test.Input.toleranceSize, err, test.Expected.err)
+				t.Errorf("CalculateTolerances(%v, %v) - %v error = %v; wantErr %v", test.Input.wantedFileSize, test.Input.toleranceSize, test.Name, err, test.Expected.err)
 				return
 			}
 
 			if result != test.Expected.results {
-				t.Errorf("CalculateTolerances(%v, %v) = %v; want %v", test.Input.wantedFileSize, test.Input.toleranceSize, result, test.Expected.results)
+				t.Errorf("CalculateTolerances(%v, %v) - %v = %v; want %v", test.Input.wantedFileSize, test.Input.toleranceSize, test.Name, result, test.Expected.results)
 			}
 		})
 	}
@@ -596,11 +638,11 @@ func TestConvertStringSizeToBytes(t *testing.T) {
 			result, err := ConvertStringSizeToBytes(test.Input)
 
 			if result != test.Expected {
-				t.Errorf("ConvertStringSizeToBytes(%q) = %v; want %v", test.Input, result, test.Expected)
+				t.Errorf("ConvertStringSizeToBytes(%q) - %v = %v; want %v", test.Input, test.Name, result, test.Expected)
 			}
 
 			if (err != nil && test.Err == nil) || (err == nil && test.Err != nil) || (err != nil && test.Err != nil && err.Error() != test.Err.Error()) {
-				t.Errorf("ConvertStringSizeToBytes(%q) error = %v; want %v", test.Input, err, test.Err)
+				t.Errorf("ConvertStringSizeToBytes(%q) - %v error = %v; want %v", test.Input, test.Name, err, test.Err)
 			}
 		})
 	}
@@ -629,11 +671,11 @@ func TestPluralize(t *testing.T) {
 			result, err := Pluralize(test.Input.count, test.Input.singular, test.Input.plural)
 
 			if result != test.Expected {
-				t.Errorf("Pluralize(%q) = %v; want %v", test.Input, result, test.Expected)
+				t.Errorf("Pluralize(%q) - %v = %v; want %v", test.Input, test.Name, result, test.Expected)
 			}
 
 			if (err != nil && test.Err == nil) || (err == nil && test.Err != nil) || (err != nil && test.Err != nil && err.Error() != test.Err.Error()) {
-				t.Errorf("Pluralize(%q) error = %v; want %v", test.Input, err, test.Err)
+				t.Errorf("Pluralize(%q) - %v error = %v; want %v", test.Input, test.Name, err, test.Err)
 			}
 		})
 	}
@@ -688,11 +730,11 @@ func TestRemoveEmptyDir(t *testing.T) {
 			result, err := RemoveEmptyDir(test.Input, ops)
 
 			if result != test.Expected {
-				t.Errorf("RemoveEmptyDir(%q) = %v; want %v", test.Input, result, test.Expected)
+				t.Errorf("RemoveEmptyDir(%q) - %v = %v; want %v", test.Input, test.Name, result, test.Expected)
 			}
 
 			if (err != nil && test.Err == nil) || (err == nil && test.Err != nil) || (err != nil && test.Err != nil && !strings.Contains(err.Error(), test.Err.Error())) {
-				t.Errorf("RemoveEmptyDir(%q) error = %v; want error containing %v", test.Input, err, test.Err)
+				t.Errorf("RemoveEmptyDir(%q) - %v error = %v; want error containing %v", test.Input, test.Name, err, test.Err)
 			}
 		})
 	}
