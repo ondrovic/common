@@ -172,7 +172,7 @@ func HandleCliFlags(cmd *cobra.Command) (bool, error) {
 			err := cmd.Help()
 			return true, err
 		case "-v", "--version":
-			pterm.Println(cmd.Version)
+			pterm.Printf("Version: %s", cmd.Version)
 			return true, nil
 		}
 	}
