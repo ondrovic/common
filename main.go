@@ -12,7 +12,7 @@ import (
 
 var (
 	application types.Application
-	version     string
+	version     string = "dev"
 )
 
 func init() {

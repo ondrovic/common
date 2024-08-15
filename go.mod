@@ -1,8 +1,9 @@
 module github.com/ondrovic/common
 
-go 1.22.5
+go 1.23
 
 require (
+	github.com/jedib0t/go-pretty/v6 v6.5.9
 	github.com/pterm/pterm v0.12.79
 	github.com/spf13/cobra v1.8.1
 )
