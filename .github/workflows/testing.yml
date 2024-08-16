@@ -20,12 +20,17 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: stable
+      - name: Configure Go Modules Proxy
+        run: |
+            echo "GOPROXY=direct" >> $GITHUB_ENV
 
       - name: Install dependencies
-        run: go mod download
+        run: go mod tidy
 
       - name: Run tests
         run: go test -coverprofile=unit.coverage.out ./...
+        env:
+          TERM: xterm
 
       - name: Upload results to Codecov
         uses: codecov/codecov-action@v4
