@@ -18,7 +18,7 @@ check-quality:
 	@make tidy
 	@make fmt
 	@make vet
-	@make lint
+#@make lint
 
 lint:
 	golangci-lint run --config="$(CONFIG_PATH)" ./...

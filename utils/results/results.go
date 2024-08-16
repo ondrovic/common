@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/jedib0t/go-pretty/v6/table"
-	"github.com/ondrovic/common/utils"
+	"github.com/ondrovic/common/utils/formatters"
 	"github.com/pterm/pterm"
 )
 
@@ -139,7 +139,7 @@ func createDataRow(data interface{}, fields []string) table.Row {
 		if f.IsValid() {
 			// Format Size if it's the Size field
 			if strings.EqualFold(field, "Size") {
-				row = append(row, utils.FormatSize(f.Int())) // Adjust to your size formatting function
+				row = append(row, formatters.FormatSize(f.Int())) // Adjust to your size formatting function
 			} else {
 				row = append(row, f.Interface())
 			}

@@ -11,8 +11,8 @@ import (
 	"testing"
 
 	"github.com/ondrovic/common/types"
+	"github.com/ondrovic/common/utils/formatters"
 	"github.com/pterm/pterm"
-	"github.com/spf13/cobra"
 )
 
 // The MockDirOps type is used for mocking directory operations in Go code.
@@ -40,6 +40,18 @@ func (m *MockDirOps) Remove(_ string) error {
 	return m.removeErr
 }
 
+// // Mock formatter to simulate the ToLower function behavior
+// var formatter = struct {
+// 	ToLower func(string) (string, error)
+// }{
+// 	ToLower: func(s string) (string, error) {
+// 		if s == "error" {
+// 			return "", fmt.Errorf("conversion error")
+// 		}
+// 		return strings.ToLower(s), nil
+// 	},
+// }
+
 // CreateTempFile creates a temporary file for testing.
 func CreateTempFile(t *testing.T) *os.File {
 	t.Helper()
@@ -53,7 +65,7 @@ func CreateTempFile(t *testing.T) *os.File {
 // CreateEmptyDir creates an empty directory for testing.
 func CreateEmptyDir(t *testing.T) string {
 	t.Helper()
-	dir := FormatPath(filepath.Join(t.TempDir(), "empty-dir"), runtime.GOOS)
+	dir := formatters.FormatPath(filepath.Join(t.TempDir(), "empty-dir"), runtime.GOOS)
 	if err := os.Mkdir(dir, 0o755); err != nil {
 		t.Fatalf("failed to create directory: %v", err)
 	}
@@ -63,7 +75,7 @@ func CreateEmptyDir(t *testing.T) string {
 // CreateNonEmptyDir creates a non-empty directory for testing.
 func CreateNonEmptyDir(t *testing.T) string {
 	t.Helper()
-	dir := filepath.Join(t.TempDir(), FormatPath("non-empty-dir", runtime.GOOS))
+	dir := filepath.Join(t.TempDir(), formatters.FormatPath("non-empty-dir", runtime.GOOS))
 	if err := os.Mkdir(dir, 0o755); err != nil {
 		t.Fatalf("failed to create directory: %v", err)
 	}
@@ -191,8 +203,6 @@ func TestApplicationBanner(t *testing.T) {
 func TestClearTerminalScreen(t *testing.T) {
 	type InputStruct struct {
 		goos string
-		cmd  string
-		// path string
 	}
 	type ExpectedOutcome struct {
 		shouldFail bool
@@ -200,7 +210,7 @@ func TestClearTerminalScreen(t *testing.T) {
 	}
 
 	// helper to determine the fail and error based on os
-	expectedResultsBasedOnOS := func(inputOS, cmd string) ExpectedOutcome {
+	expectedResultsBasedOnOS := func(inputOS string) ExpectedOutcome {
 		shouldFail := runtime.GOOS != inputOS
 
 		if inputOS == "unknown" {
@@ -209,20 +219,9 @@ func TestClearTerminalScreen(t *testing.T) {
 				fmt.Errorf("unsupported platform: %s", "unknown"),
 			}
 		} else if shouldFail {
-			var path = ""
-
-			switch inputOS {
-			case "linux", "darwin":
-				{
-					path = "%PATH%"
-				}
-			case "windows":
-				path = "$PATH"
-			}
-
 			return ExpectedOutcome{
 				true,
-				fmt.Errorf("failed to clear terminal: exec: \"%s\": executable file not found in %s", cmd, path),
+				fmt.Errorf("failed to clear terminal"),
 			}
 		}
 
@@ -234,15 +233,15 @@ func TestClearTerminalScreen(t *testing.T) {
 
 	tests := []*types.TestLayout[InputStruct, ExpectedOutcome]{
 		// ExpectedOutcome is calculated before the test runs
-		{Name: "Test Linux clear command", Input: InputStruct{goos: "linux", cmd: "clear"}},
-		{Name: "Test Windows clear command", Input: InputStruct{goos: "windows", cmd: "cmd"}},
+		{Name: "Test Linux clear command", Input: InputStruct{goos: "linux"}},
+		{Name: "Test Windows clear command", Input: InputStruct{goos: "windows"}},
 		{Name: "Test unsupported OS", Input: InputStruct{goos: "unknown"}},
 	}
 
 	for _, test := range tests {
 		t.Run(test.Name, func(t *testing.T) {
 			// Determine if the test should fail based on the current OS
-			results := expectedResultsBasedOnOS(test.Input.goos, test.Input.cmd)
+			results := expectedResultsBasedOnOS(test.Input.goos)
 
 			test.Expected.shouldFail = results.shouldFail
 			test.Expected.err = results.err
@@ -326,122 +325,6 @@ func TestToOperatorType(t *testing.T) {
 	}
 }
 
-// TestGetVersion tests GetVersion func.
-func TestGetVersion(t *testing.T) {
-	type InputStruct struct {
-		version  string
-		fallback string
-	}
-
-	tests := []*types.TestLayout[InputStruct, string]{
-		{Name: "Empty version returns fallback value", Input: InputStruct{version: "", fallback: "test-ver"}, Expected: "test-ver"},
-		{Name: "Non-empty version ignores fallback, returns version", Input: InputStruct{version: "1.0.0", fallback: "test-ver"}, Expected: "1.0.0"},
-	}
-
-	for _, test := range tests {
-		t.Run(test.Name, func(t *testing.T) { // Run each test case as a sub-test
-			result := GetVersion(test.Input.version, test.Input.fallback)
-			if result != test.Expected {
-				t.Errorf("GetVersion() - %v(%q) = %q; expected %q", test.Name, test.Input, result, test.Expected)
-			}
-		})
-	}
-}
-
-// TestHandleCliFlags tests HandleCliFlags func.
-func TestHandleCliFlags(t *testing.T) {
-	type ExpectedOutcome struct {
-		result bool
-		err    error
-	}
-	tests := []*types.TestLayout[string, ExpectedOutcome]{
-		{Name: "Help flag -h", Input: "-h", Expected: ExpectedOutcome{result: true, err: nil}},
-		{Name: "Help flag --help", Input: "--help", Expected: ExpectedOutcome{result: true, err: nil}},
-		{Name: "Version flag -v", Input: "-v", Expected: ExpectedOutcome{result: true, err: nil}},
-		{Name: "Version flag --version", Input: "--version", Expected: ExpectedOutcome{result: true, err: nil}},
-		{Name: "Any other flag", Input: "-o", Expected: ExpectedOutcome{result: false, err: nil}},
-	}
-
-	for _, test := range tests {
-		t.Run(test.Name, func(t *testing.T) {
-			// Save and restore os.Args
-			oldArgs := os.Args
-			defer func() { os.Args = oldArgs }()
-
-			// Set up test args
-			os.Args = []string{"program", test.Input}
-
-			// Create a mock cobra.Command
-			cmd := &cobra.Command{
-				Use: "test",
-			}
-
-			result, err := HandleCliFlags(cmd)
-
-			if result != test.Expected.result {
-				t.Errorf("HandleCliFlags() - %v(%q) result = %v; expected %v", test.Name, test.Input, result, test.Expected.result)
-			}
-
-			if (err == nil && test.Expected.err != nil) || (err != nil && test.Expected.err == nil) || (err != nil && err.Error() == test.Expected.err.Error()) {
-				t.Errorf("HandleCliFlags() - %v(%q) error = %c; expected %v", test.Name, test.Input, err, test.Expected.err)
-			}
-		})
-	}
-}
-
-// TestFormatSize tests FormatSize func.
-func TestFormatSize(t *testing.T) {
-	tests := []*types.TestLayout[int64, string]{
-		{Name: "Test 0 B", Input: 0, Expected: "0 B", Err: nil},
-		{Name: "Test 1 B", Input: 1, Expected: "1.00 B", Err: nil},
-		{Name: "Test 2 B", Input: 2, Expected: "2.00 B", Err: nil},
-		{Name: "Test 1 KB", Input: 1024, Expected: "1.00 KB", Err: nil},
-		{Name: "Test 2 KB", Input: 2048, Expected: "2.00 KB", Err: nil},
-		{Name: "Test 1 MB", Input: 1048576, Expected: "1.00 MB", Err: nil},
-		{Name: "Test 2 MB", Input: 2097152, Expected: "2.00 MB", Err: nil},
-		{Name: "Test 1 GB", Input: 1073741824, Expected: "1.00 GB", Err: nil},
-		{Name: "Test 2 GB", Input: 2147483648, Expected: "2.00 GB", Err: nil},
-		{Name: "Test 1 TB", Input: 1099511627776, Expected: "1.00 TB", Err: nil},
-		{Name: "Test 2 TB", Input: 2199023255552, Expected: "2.00 TB", Err: nil},
-		{Name: "Test 1 PB", Input: 1125899906842624, Expected: "1.00 PB", Err: nil},
-		{Name: "Test 2 PB", Input: 2251799813685248, Expected: "2.00 PB", Err: nil},
-	}
-
-	for _, test := range tests {
-		t.Run(test.Name, func(t *testing.T) { // Run each test case as a sub-test
-			result := FormatSize(test.Input)
-			if result != test.Expected {
-				t.Errorf("FormatSize(%q) - %v = %q; expected %q", test.Input, test.Name, result, test.Expected)
-			}
-		})
-	}
-}
-
-// TestFormatPath tests FormatPath func.
-func TestFormatPath(t *testing.T) {
-	type InputStruct struct {
-		Path string
-		GOOS string
-	}
-
-	var dir = CreateNonEmptyDir(t)
-	var filePath = filepath.Join(dir, "testfile.txt")
-	tests := []*types.TestLayout[InputStruct, string]{
-		{Name: "Test Linux path", Input: InputStruct{Path: filePath, GOOS: "linux"}, Expected: FormatPath(filePath, "linux"), Err: nil},
-		{Name: "Test Windows path", Input: InputStruct{Path: filePath, GOOS: "windows"}, Expected: FormatPath(filePath, "windows"), Err: nil},
-		{Name: "Test Default path", Input: InputStruct{Path: filePath, GOOS: "unknown"}, Expected: FormatPath(filePath, "unknown"), Err: nil},
-	}
-
-	for _, test := range tests {
-		t.Run(test.Name, func(t *testing.T) { // Run each test case as a sub-test
-			result := FormatPath(test.Input.Path, test.Input.GOOS)
-			if result != test.Expected {
-				t.Errorf("FormatPath(%q, %q) - %v = %q; expected %q", test.Input.Path, test.Input.GOOS, test.Name, result, test.Expected)
-			}
-		})
-	}
-}
-
 // TestIsExtensionValid tests IsExtensionValid func.
 func TestIsExtensionValid(t *testing.T) {
 	type InputStruct struct {
@@ -500,7 +383,7 @@ func TestIsDirectoryEmpty(t *testing.T) {
 	tests := []*types.TestLayout[string, bool]{
 		{Name: "Test empty directory", Input: emptyDir, Expected: true, Err: nil},
 		{Name: "Test non-empty directory", Input: nonEmptyDir, Expected: false, Err: nil},
-		{Name: "Test non-existing directory stat", Input: statFilePath, Expected: false, Err: fmt.Errorf("stat %s: no such file or directory", statFilePath)}, // works on gh action but not locally
+		{Name: "Test non-existing directory stat", Input: statFilePath, Expected: false, Err: fmt.Errorf("stat error - file not found: %s", statFilePath)},
 		{Name: "Test file instead of directory", Input: file.Name(), Expected: false, Err: errors.New("not a directory")},
 		{Name: "Test Dir with read error", Input: readDirErrorPath, Expected: false, Err: fmt.Errorf("simulated ReadDir error")},
 	}
@@ -647,39 +530,6 @@ func TestConvertStringSizeToBytes(t *testing.T) {
 	}
 }
 
-// TestPluralize tests Pluralize func.
-func TestPluralize(t *testing.T) {
-	type InputStruct struct {
-		count    interface{}
-		singular string
-		plural   string
-	}
-
-	tests := []*types.TestLayout[InputStruct, string]{
-		{Name: "Test Negative Count", Input: InputStruct{count: -1, singular: "", plural: ""}, Expected: "", Err: fmt.Errorf("count cannot be negative")},
-		{Name: "Singular cannot be empty", Input: InputStruct{count: 0, singular: "", plural: "wants"}, Expected: "", Err: fmt.Errorf("singular and plural forms cannot be empty")},
-		{Name: "Plural cannot be empty", Input: InputStruct{count: 0, singular: "want", plural: ""}, Expected: "", Err: fmt.Errorf("singular and plural forms cannot be empty")},
-		{Name: "Singular case", Input: InputStruct{count: 1, singular: "want", plural: "wants"}, Expected: "want", Err: nil},
-		{Name: "Plural case", Input: InputStruct{count: 2, singular: "want", plural: "wants"}, Expected: "wants", Err: nil},
-		{Name: "Default case", Input: InputStruct{count: 1.25, singular: "want", plural: "wants"}, Expected: "", Err: fmt.Errorf("count must be an integer")},
-		{Name: "Zero count", Input: InputStruct{count: 0, singular: "want", plural: "wanted"}, Expected: "want", Err: nil},
-	}
-
-	for _, test := range tests {
-		t.Run(test.Name, func(t *testing.T) {
-			result, err := Pluralize(test.Input.count, test.Input.singular, test.Input.plural)
-
-			if result != test.Expected {
-				t.Errorf("Pluralize(%q) - %v = %v; want %v", test.Input, test.Name, result, test.Expected)
-			}
-
-			if (err != nil && test.Err == nil) || (err == nil && test.Err != nil) || (err != nil && test.Err != nil && err.Error() != test.Err.Error()) {
-				t.Errorf("Pluralize(%q) - %v error = %v; want %v", test.Input, test.Name, err, test.Err)
-			}
-		})
-	}
-}
-
 // TestRemoveEmptyDir tests RemoveEmptyDir func.
 func TestRemoveEmptyDir(t *testing.T) {
 	// Create paths for test cases
@@ -736,5 +586,73 @@ func TestRemoveEmptyDir(t *testing.T) {
 				t.Errorf("RemoveEmptyDir(%q) - %v error = %v; want error containing %v", test.Input, test.Name, err, test.Err)
 			}
 		})
+	}
+}
+
+// TestInRange tests the InRange function with different scenarios.
+func TestInRange(t *testing.T) {
+	type InputStruct struct {
+		target  interface{}
+		options interface{}
+	}
+
+	// Save the original ToLowerWrapper function
+	originalToLower := ToLowerWrapper
+
+	// Defer function to restore the original ToLowerWrapper after tests are done
+	defer func() {
+		ToLowerWrapper = originalToLower
+	}()
+
+	// Mock ToLowerWrapper function
+	ToLowerWrapper = func(input interface{}) (string, error) {
+		switch input {
+		case "errorOption", "error":
+			return "", fmt.Errorf("conversion error")
+		default:
+			return formatters.ToLower(input)
+		}
+
+	}
+
+	tests := []*types.TestLayout[InputStruct, bool]{
+		{Name: "Test target matches option - single match", Input: InputStruct{target: "Hello", options: []string{"hello", "world"}}, Expected: true},
+		{Name: "Test target does not match any option", Input: InputStruct{target: "foo", options: []string{"bar", "baz"}}, Expected: false},
+		{Name: "Test single option match", Input: InputStruct{target: "yes", options: "yes"}, Expected: true},
+		{Name: "Test empty target", Input: InputStruct{target: "", options: []string{"a", "b"}}, Expected: false},
+		{Name: "Test empty options", Input: InputStruct{target: "test", options: []string{}}, Expected: false},
+		{Name: "Test invalid target type", Input: InputStruct{target: 123, options: []string{"a", "b"}}, Expected: false, Err: fmt.Errorf("error converting target to lowercase: 123")},
+		{Name: "Test invalid options type", Input: InputStruct{target: "test", options: 123}, Expected: false, Err: fmt.Errorf("options must be a string or a slice of strings")},
+		{Name: "Test conversion error in target", Input: InputStruct{target: "error", options: []string{"valid"}}, Expected: false, Err: fmt.Errorf("error converting target to lowercase: error")},
+		{Name: "Test conversion error in options", Input: InputStruct{target: "valid", options: []string{"error"}}, Expected: false, Err: fmt.Errorf("error converting option to lowercase: error")},
+		{Name: "Test conversion error in options string", Input: InputStruct{target: "valid", options: "errorOption"}, Expected: false, Err: fmt.Errorf("error converting option to lowercase: errorOption")},
+	}
+
+	for _, test := range tests {
+		t.Run(test.Name, func(t *testing.T) {
+			result, err := InRange(test.Input.target, test.Input.options)
+
+			if result != test.Expected {
+				t.Errorf("InRange(%v, %v) - %v = %v; expected %v", test.Input.target, test.Input.options, test.Name, result, test.Expected)
+			}
+			if (err != nil && test.Err == nil) || (err == nil && test.Err != nil) || (err != nil && test.Err != nil && err.Error() != test.Err.Error()) {
+				t.Errorf("InRange(%v, %v) - %v = %v; expected %v", test.Input.target, test.Input.options, test.Name, err, test.Err)
+			}
+		})
+	}
+}
+
+func TestDefaultToLowerWrapper(t *testing.T) {
+	// Test the default behavior of ToLowerWrapper
+	input := "TeSt"
+	expected := "test"
+
+	result, err := ToLowerWrapper(input)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	if result != expected {
+		t.Errorf("ToLowerWrapper(%v) = %v; expected %v", input, result, expected)
 	}
 }

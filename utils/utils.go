@@ -3,7 +3,6 @@ package utils
 import (
 	"errors"
 	"fmt"
-	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -14,14 +13,21 @@ import (
 	"unicode"
 
 	"github.com/ondrovic/common/types"
+	"github.com/ondrovic/common/utils/formatters"
 	"github.com/pterm/pterm"
-	"github.com/spf13/cobra"
 )
 
 var (
-	cmd        *exec.Cmd
-	osStatFunc = os.Stat
+	cmd            *exec.Cmd
+	osStatFunc     = os.Stat
+	ToLowerWrapper = func(input interface{}) (string, error) {
+		return formatters.ToLower(input)
+	}
 )
+
+//TODO: replace all strings.ToLower with ToLowerWrapper
+//TODO: make ToContainsWrapper
+//TODO: replace strings.Contains with ToContainsWrapper
 
 // Function to check if a string field is empty.
 func validateStringField(fieldName, value string) error {
@@ -40,7 +46,7 @@ func validateStructField(fieldName string, value reflect.Value) error {
 }
 
 // Validate function using reflection.
-func validateApp(app interface{}) error {
+func validateStruct(app interface{}) error {
 	v := reflect.ValueOf(app)
 
 	// If it's a pointer, dereference it
@@ -80,7 +86,7 @@ func ApplicationBanner(app *types.Application, clearScreen func(string) error) e
 		return err
 	}
 
-	if err := validateApp(app); err != nil {
+	if err := validateStruct(app); err != nil {
 		return err
 	}
 
@@ -113,34 +119,10 @@ func ClearTerminalScreen(goos string) error {
 	cmd.Stderr = os.Stderr
 	// Run the command
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("failed to clear terminal: %w", err)
+		return fmt.Errorf("failed to clear terminal")
 	}
 
 	return nil
-}
-
-// The function `GetVersion` is used for setting the version.
-func GetVersion(version, fallback string) string {
-	if version == "" {
-		return fallback
-	}
-
-	return version
-}
-
-// The function `HandleCliFlags` is used to handle cobra cli flags.
-func HandleCliFlags(cmd *cobra.Command) (bool, error) {
-	if len(os.Args) > 1 {
-		switch os.Args[1] {
-		case "-h", "--help":
-			err := cmd.Help()
-			return true, err
-		case "-v", "--version":
-			pterm.Printf("Version: %s", cmd.Version)
-			return true, nil
-		}
-	}
-	return false, nil
 }
 
 // The function `ToFileType` converts a string representation of a file type to a corresponding enum
@@ -181,37 +163,6 @@ func ToOperatorType(operatorType string) types.OperatorType {
 	}
 }
 
-// The `FormatSize` function converts a given size in bytes to a human-readable format with appropriate
-// units.
-func FormatSize(bytes int64) string {
-	for _, unit := range types.SizeUnits {
-		if bytes >= unit.Size {
-			value := float64(bytes) / float64(unit.Size)
-			// Round the value to two decimal places
-			roundedValue := math.Round(value*100) / 100
-			return fmt.Sprintf("%.2f %s", roundedValue, unit.Label)
-		}
-	}
-
-	return "0 B"
-}
-
-// The `FormatPath` function converts file paths to either Windows or Unix style based on the operating
-// system specified.
-func FormatPath(path, goos string) string {
-	switch goos {
-	case "windows":
-		// Convert to Windows style paths (with backslashes)
-		return filepath.FromSlash(path)
-	case "linux", "darwin":
-		// Convert to Unix style paths (with forward slashes)
-		return filepath.ToSlash(path)
-	default:
-		// Default to Unix style paths
-		return path
-	}
-}
-
 // The IsExtensionValid function checks if a given file extension is valid for a specified file type
 // based on a predefined list of allowed extensions.
 func IsExtensionValid(fileType types.FileType, path string) bool {
@@ -234,7 +185,7 @@ func IsExtensionValid(fileType types.FileType, path string) bool {
 func IsDirectoryEmpty(path string, ops types.DirOps) (bool, error) {
 	fileInfo, err := osStatFunc(path)
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("stat error - file not found: %s", path)
 	}
 
 	if !fileInfo.IsDir() {
@@ -304,6 +255,8 @@ func CalculateTolerances(wantedFileSize int64, toleranceSize float64) (types.Tol
 	}, nil
 }
 
+// TODO: make over version of TrimSpace with error handling use interface{}
+// TODO: make over version of ToUpper with error handling use interface{}
 // The function `ConvertStringSizeToBytes` converts a string representation of size with units to
 // bytes.
 func ConvertStringSizeToBytes(sizeStr string) (int64, error) {
@@ -347,28 +300,6 @@ func ConvertStringSizeToBytes(sizeStr string) (int64, error) {
 	return 0, errors.New("invalid size unit")
 }
 
-// The Pluralize function takes a count and returns the singular or plural form of a word based on the
-// count.
-func Pluralize(count interface{}, singular, plural string) (string, error) {
-	// Validate that count is an integer type
-	switch v := reflect.ValueOf(count); v.Kind() {
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		// Continue with the logic only if count is a valid integer
-		if v.Int() < 0 {
-			return "", errors.New("count cannot be negative")
-		}
-		if singular == "" || plural == "" {
-			return "", errors.New("singular and plural forms cannot be empty")
-		}
-		if v.Int() <= 1 {
-			return singular, nil
-		}
-		return plural, nil
-	default:
-		return "", errors.New("count must be an integer")
-	}
-}
-
 // The function `RemoveEmptyDir` checks if a directory is empty and removes it if it is.
 func RemoveEmptyDir(path string, ops types.DirOps) (bool, error) {
 	// Check if the directory exists
@@ -403,4 +334,39 @@ func RemoveEmptyDir(path string, ops types.DirOps) (bool, error) {
 	}
 
 	return true, nil
+}
+
+// InRange checks if a target string matches any string in the options slice.
+// It uses the ToLower function to ensure case-insensitive comparison.
+// It returns a boolean indicating if a match is found and an error if any conversion fails.
+func InRange(target interface{}, options interface{}) (bool, error) {
+	lowerTarget, err := ToLowerWrapper(target)
+	if err != nil {
+		return false, fmt.Errorf("error converting target to lowercase: %v", target)
+	}
+
+	switch opts := options.(type) {
+	case string:
+		lowerOption, err := ToLowerWrapper(opts)
+		if err != nil {
+			return false, fmt.Errorf("error converting option to lowercase: %v", opts)
+		}
+		if lowerTarget == lowerOption {
+			return true, nil
+		}
+	case []string:
+		for _, option := range opts {
+			lowerOption, err := ToLowerWrapper(option)
+			if err != nil {
+				return false, fmt.Errorf("error converting option to lowercase: %v", option)
+			}
+			if lowerTarget == lowerOption {
+				return true, nil
+			}
+		}
+	default:
+		return false, fmt.Errorf("options must be a string or a slice of strings")
+	}
+
+	return false, nil
 }
