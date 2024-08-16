@@ -4,6 +4,7 @@
 [![CodeFactor](https://www.codefactor.io/repository/github/ondrovic/common/badge)](https://www.codefactor.io/repository/github/ondrovic/common)
 [![CodeQL](https://github.com/ondrovic/common/actions/workflows/github-code-scanning/codeql/badge.svg)](https://github.com/ondrovic/common/actions/workflows/github-code-scanning/codeql)
 [![testing](https://github.com/ondrovic/common/actions/workflows/testing.yml/badge.svg)](https://github.com/ondrovic/common/actions/workflows/testing.yml)
+![License](https://img.shields.io/badge/license-MIT-blue)
 
 # common
 Shared common code for my packages
