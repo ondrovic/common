@@ -99,8 +99,6 @@ func ApplicationBanner(app *types.Application, clearScreen func(string) error) e
 // The function `ClearTerminalScreen` clears the terminal screen based on the operating system specified
 // by the `goos` parameter.
 func ClearTerminalScreen(goos string) error {
-	// var cmd *exec.Cmd
-
 	switch strings.ToLower(goos) {
 	case "linux", "darwin":
 		cmd = exec.Command("clear")
@@ -110,6 +108,9 @@ func ClearTerminalScreen(goos string) error {
 		return fmt.Errorf("unsupported platform: %s", goos)
 	}
 
+	// attach to current process
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
 	// Run the command
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("failed to clear terminal: %w", err)
