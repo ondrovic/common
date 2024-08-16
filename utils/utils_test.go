@@ -189,13 +189,18 @@ func TestApplicationBanner(t *testing.T) {
 
 // TestClearTerminalScreen tests the ClearTerminalScreen func.
 func TestClearTerminalScreen(t *testing.T) {
+	type InputStruct struct {
+		goos string
+		cmd  string
+		// path string
+	}
 	type ExpectedOutcome struct {
 		shouldFail bool
 		err        error
 	}
 
 	// helper to determine the fail and error based on os
-	expectedResultsBasedOnOS := func(inputOS string) ExpectedOutcome {
+	expectedResultsBasedOnOS := func(inputOS, cmd string) ExpectedOutcome {
 		shouldFail := runtime.GOOS != inputOS
 
 		if inputOS == "unknown" {
@@ -204,9 +209,20 @@ func TestClearTerminalScreen(t *testing.T) {
 				fmt.Errorf("unsupported platform: %s", "unknown"),
 			}
 		} else if shouldFail {
+			var path = ""
+
+			switch inputOS {
+			case "linux", "darwin":
+				{
+					path = "%PATH%"
+				}
+			case "windows":
+				path = "$PATH"
+			}
+
 			return ExpectedOutcome{
 				true,
-				errors.New("failed to clear terminal: exec: \"clear\": executable file not found in %PATH%"),
+				fmt.Errorf("failed to clear terminal: exec: \"%s\": executable file not found in %s", cmd, path),
 			}
 		}
 
@@ -216,24 +232,22 @@ func TestClearTerminalScreen(t *testing.T) {
 		}
 	}
 
-	tests := []*types.TestLayout[string, ExpectedOutcome]{
+	tests := []*types.TestLayout[InputStruct, ExpectedOutcome]{
 		// ExpectedOutcome is calculated before the test runs
-		{Name: "Test Linux clear command", Input: "linux"},
-		// {Name: "Test macOS clear command", Input: "darwin"},
-		// {Name: "Test Windows clear command", Input: "windows"},
-		{Name: "Test unsupported OS", Input: "unknown"},
-		{Name: "Test Linux clear command failure", Input: "linux"},
+		{Name: "Test Linux clear command", Input: InputStruct{goos: "linux", cmd: "clear"}},
+		{Name: "Test Windows clear command", Input: InputStruct{goos: "windows", cmd: "cmd"}},
+		{Name: "Test unsupported OS", Input: InputStruct{goos: "unknown"}},
 	}
 
 	for _, test := range tests {
 		t.Run(test.Name, func(t *testing.T) {
 			// Determine if the test should fail based on the current OS
-			results := expectedResultsBasedOnOS(test.Input)
+			results := expectedResultsBasedOnOS(test.Input.goos, test.Input.cmd)
 
 			test.Expected.shouldFail = results.shouldFail
 			test.Expected.err = results.err
 
-			err := ClearTerminalScreen(test.Input)
+			err := ClearTerminalScreen(test.Input.goos)
 			switch {
 			case err != nil && test.Expected.err == nil:
 				t.Errorf("ClearTerminalScreen() - %v(%q) = %v; expected no error", test.Name, test.Input, err)
@@ -409,13 +423,13 @@ func TestFormatPath(t *testing.T) {
 		Path string
 		GOOS string
 	}
+
+	var dir = CreateNonEmptyDir(t)
+	var filePath = filepath.Join(dir, "testfile.txt")
 	tests := []*types.TestLayout[InputStruct, string]{
-		// {Name: "Test Windows path formatesting", Input: InputStruct{Path: `C:\path\to\file`, GOOS: "windows"}, Expected: `C:\path\to\file`, Err: nil},
-		// {Name: "Test Linux path formatesting", Input: InputStruct{Path: `\path\to\file`, GOOS: "linux"}, Expected: `/path/to/file`, Err: nil},
-		// {Name: "Test macOS path formatesting", Input: InputStruct{Path: `/path/to/file`, GOOS: "darwin"}, Expected: `/path/to/file`, Err: nil},
-		// {Name: "Test default case for Unix", Input: InputStruct{Path: `/path/to/file`, GOOS: "unknown"}, Expected: `/path/to/file`, Err: nil},
-		// {Name: "Test Windows path with forward slashes", Input: InputStruct{Path: `C:/path/to/file`, GOOS: "windows"}, Expected: `C:\path\to\file`, Err: nil},
-		// {Name: "Test Unix path with backslashes", Input: InputStruct{Path: `\path\to\file`, GOOS: "linux"}, Expected: `/path/to/file`, Err: nil},
+		{Name: "Test Linux path", Input: InputStruct{Path: filePath, GOOS: "linux"}, Expected: FormatPath(filePath, "linux"), Err: nil},
+		{Name: "Test Windows path", Input: InputStruct{Path: filePath, GOOS: "windows"}, Expected: FormatPath(filePath, "windows"), Err: nil},
+		{Name: "Test Default path", Input: InputStruct{Path: filePath, GOOS: "unknown"}, Expected: FormatPath(filePath, "unknown"), Err: nil},
 	}
 
 	for _, test := range tests {
@@ -482,11 +496,11 @@ func TestIsDirectoryEmpty(t *testing.T) {
 	nonEmptyDir := CreateNonEmptyDir(t)
 	file := CreateTempFile(t)
 	readDirErrorPath := CreateEmptyDir(t)
+	statFilePath := filepath.Join(emptyDir, "whoops-not-here.txt")
 	tests := []*types.TestLayout[string, bool]{
 		{Name: "Test empty directory", Input: emptyDir, Expected: true, Err: nil},
 		{Name: "Test non-empty directory", Input: nonEmptyDir, Expected: false, Err: nil},
-		// {Name: "Test non-existing directory", Input: "/path/to/non_existent_dir", Expected: false, Err: fmt.Errorf("The system cannot find the path specified")},
-		// {Name: "Test non-existing directory", Input: "/path/to/non_existent_dir", Expected: false, Err: fmt.Errorf("stat /path/to/non_existent_dir: no such file or directory")}, // works on gh actions not locally
+		{Name: "Test non-existing directory stat", Input: statFilePath, Expected: false, Err: fmt.Errorf("stat %s: no such file or directory", statFilePath)}, // works on gh action but not locally
 		{Name: "Test file instead of directory", Input: file.Name(), Expected: false, Err: errors.New("not a directory")},
 		{Name: "Test Dir with read error", Input: readDirErrorPath, Expected: false, Err: fmt.Errorf("simulated ReadDir error")},
 	}
