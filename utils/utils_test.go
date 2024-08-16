@@ -15,22 +15,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// The MockCmd type is a struct used for mocking commands in Go code.
-// @property {error} err - The `err` property in the `MockCmd` struct is a field that holds an error
-// value. It can be used to store an error that may occur during the execution of a command or
-// operation.
-type MockCmd struct {
-	err error
-}
-
-// The above code snippet is defining a method named `Run` for a struct type `MockCmd`. This method
-// takes a pointer receiver `m` of type `MockCmd` and returns an error. Inside the method, it simply
-// returns the error `m.err`. This method is likely intended to simulate running a command and
-// returning an error if any.
-func (m *MockCmd) Run() error {
-	return m.err
-}
-
 // The MockDirOps type is used for mocking directory operations in Go code.
 // @property {error} readDirErr - The `readDirErr` property in the `MockDirOps` struct is used to store
 // an error that may occur when atestempting to read a directory. This error could be related to issues
@@ -222,7 +206,7 @@ func TestClearTerminalScreen(t *testing.T) {
 		} else if shouldFail {
 			return ExpectedOutcome{
 				true,
-				errors.New("failed to clear terminal exec"),
+				errors.New("failed to clear terminal: exec: \"clear\": executable file not found in %PATH%"),
 			}
 		}
 

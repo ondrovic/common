@@ -18,42 +18,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// The CommandExecutor interface defines a method Run that executes a command and returns an error.
-// @property {error} Run - The `Run` method is a function defined in the `CommandExecutor` interface.
-// This method is expected to execute a command and return an error if any issues occur during the
-// execution.
-type CommandExecutor interface {
-	Run() error
-}
-
-// The RealCmd type represents a command to be executed in Go.
-// @property cmd - The `cmd` property in the `RealCmd` struct is a pointer to an `exec.Cmd` struct.
-// This property is used to store information about a command that can be executed in the operating
-// system.
-type RealCmd struct {
-	cmd *exec.Cmd
-}
-
-// The `func (r *RealCmd) Run() error` method is a method defined on the `RealCmd` struct. This method
-// implements the `Run` function of the `CommandExecutor` interface.
-func (r *RealCmd) Run() error {
-	r.cmd.Stdout = os.Stdout
-	return r.cmd.Run()
-}
-
 var (
-	// The line `ExecCommand = func(name string, arg ...string) CommandExecutor {
-	// 		return &RealCmd{cmd: exec.Command(name, arg...)}
-	// 	}` is defining a variable `ExecCommand` as a function literal. This function takes a `name` string
-	// parameter and a variadic parameter `arg` which is a slice of strings. It returns an instance of the
-	// `RealCmd` struct that implements the `CommandExecutor` interface.
-	ExecCommand = func(name string, arg ...string) CommandExecutor {
-		return &RealCmd{cmd: exec.Command(name, arg...)}
-	}
-
-	// The line `osStatFunc = os.Stat` is creating a variable `osStatFunc` and assigning it the value of
-	// the `os.Stat` function. This is essentially creating an alias for the `os.Stat` function, allowing
-	// it to be referenced by the new variable name `osStatFunc` within the package.
+	cmd        *exec.Cmd
 	osStatFunc = os.Stat
 )
 
@@ -130,26 +96,23 @@ func ApplicationBanner(app *types.Application, clearScreen func(string) error) e
 	return nil
 }
 
-// The function `ClearTerminalScreen` clears the terminal screen based on the operating system provided
-// as an argument.
+// The function `ClearTerminalScreen` clears the terminal screen based on the operating system specified
+// by the `goos` parameter.
 func ClearTerminalScreen(goos string) error {
-	var cmd CommandExecutor
-	var err error
+	// var cmd *exec.Cmd
 
 	switch strings.ToLower(goos) {
 	case "linux", "darwin":
-		cmd = ExecCommand("clear")
+		cmd = exec.Command("clear")
 	case "windows":
-		cmd = ExecCommand("cmd", "/c", "cls")
+		cmd = exec.Command("cmd", "/c", "cls")
 	default:
 		return fmt.Errorf("unsupported platform: %s", goos)
 	}
 
-	if cmd != nil {
-		err = cmd.Run()
-		if err != nil {
-			return fmt.Errorf("failed to clear terminal %w", err)
-		}
+	// Run the command
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to clear terminal: %w", err)
 	}
 
 	return nil

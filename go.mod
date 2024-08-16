@@ -1,6 +1,6 @@
 module github.com/ondrovic/common
 
-go 1.23
+go 1.22.6
 
 require (
 	github.com/jedib0t/go-pretty/v6 v6.5.9
