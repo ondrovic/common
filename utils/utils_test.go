@@ -12,7 +12,6 @@ import (
 
 	"github.com/ondrovic/common/types"
 	"github.com/ondrovic/common/utils/formatters"
-	"github.com/pterm/pterm"
 )
 
 // The MockDirOps type is used for mocking directory operations in Go code.
@@ -39,18 +38,6 @@ func (m *MockDirOps) ReadDir(_ string) ([]os.DirEntry, error) {
 func (m *MockDirOps) Remove(_ string) error {
 	return m.removeErr
 }
-
-// // Mock formatter to simulate the ToLower function behavior
-// var formatter = struct {
-// 	ToLower func(string) (string, error)
-// }{
-// 	ToLower: func(s string) (string, error) {
-// 		if s == "error" {
-// 			return "", fmt.Errorf("conversion error")
-// 		}
-// 		return strings.ToLower(s), nil
-// 	},
-// }
 
 // CreateTempFile creates a temporary file for testing.
 func CreateTempFile(t *testing.T) *os.File {
@@ -150,110 +137,39 @@ func TestValidateStructField(t *testing.T) {
 	}
 }
 
-// TestApplicationBanner tests ApplicationBanner func.
-func TestApplicationBanner(t *testing.T) {
-	type InputStruct struct {
-		app         *types.Application
-		clearScreen func(string) error
+func TestValidateStruct(t *testing.T) {
+	type NestedStruct struct {
+		FieldB string
 	}
 
-	tests := []*types.TestLayout[InputStruct, error]{
-		{
-			Name: "ClearTerminalScreen error",
-			Input: InputStruct{
-				app: &types.Application{
-					Name:        "Test App",
-					Description: "Test Description",
-					Style:       types.Styles{Color: types.Colors{Background: pterm.BgRed, Foreground: pterm.FgWhite}},
-					Usage:       "Test Usage",
-					Version:     "1.0.0",
-				},
-				clearScreen: func(string) error {
-					return fmt.Errorf("simulated clear screen error")
-				},
-			},
-			Expected: fmt.Errorf("simulated clear screen error"),
-		},
-		{Name: "Application is not a struct", Input: InputStruct{app: nil, clearScreen: ClearTerminalScreen}, Expected: fmt.Errorf("validateApp expects a struct")},
-		{Name: "Empty application name", Input: InputStruct{app: &types.Application{Description: "Test Description", Style: types.Styles{Color: types.Colors{}}, Usage: "Test Usage", Version: "1.0.0"}, clearScreen: ClearTerminalScreen}, Expected: fmt.Errorf("Name cannot be empty")},
-		{Name: "Empty application description", Input: InputStruct{app: &types.Application{Name: "Test App", Style: types.Styles{Color: types.Colors{}}, Usage: "Test Usage", Version: "1.0.0"}, clearScreen: ClearTerminalScreen}, Expected: fmt.Errorf("Description cannot be empty")},
-		{Name: "Empty application style struct", Input: InputStruct{app: &types.Application{Name: "Test App", Description: "Test Description", Style: types.Styles{Color: types.Colors{}}, Usage: "Test Usage", Version: "1.0.0"}, clearScreen: ClearTerminalScreen}, Expected: fmt.Errorf("Style cannot be an empty struct")},
-		{Name: "Empty application usage", Input: InputStruct{app: &types.Application{Name: "Test App", Description: "Test Description", Style: types.Styles{Color: types.Colors{Background: pterm.BgRed, Foreground: pterm.FgWhite}}, Version: "1.0.0"}, clearScreen: ClearTerminalScreen}, Expected: fmt.Errorf("Usage cannot be empty")},
-		{Name: "Empty application version", Input: InputStruct{app: &types.Application{Name: "Test App", Description: "Test Description", Style: types.Styles{Color: types.Colors{Background: pterm.BgRed, Foreground: pterm.FgWhite}}, Usage: "Test Usage"}, clearScreen: ClearTerminalScreen}, Expected: fmt.Errorf("Version cannot be empty")},
-		{Name: "Valid application", Input: InputStruct{app: &types.Application{Name: "Test App", Description: "Test Description", Style: types.Styles{Color: types.Colors{Background: pterm.BgRed, Foreground: pterm.FgWhite}}, Usage: "Test Usage", Version: "1.0.0"}, clearScreen: ClearTerminalScreen}, Expected: nil},
+	type InputStruct struct {
+		FieldA string
+		FieldC NestedStruct
+	}
+
+	tests := []struct {
+		name     string
+		input    interface{}
+		expected error
+	}{
+		{name: "Valid struct", input: InputStruct{FieldA: "value", FieldC: NestedStruct{FieldB: "nestedValue"}}, expected: nil},
+		{name: "Invalid string field", input: InputStruct{FieldA: "", FieldC: NestedStruct{FieldB: "nestedValue"}}, expected: fmt.Errorf("FieldA cannot be empty")},
+		{name: "Invalid nested struct field", input: InputStruct{FieldA: "value", FieldC: NestedStruct{FieldB: ""}}, expected: fmt.Errorf("FieldC cannot be an empty struct")},
+		{name: "Invalid pointer to struct", input: &InputStruct{FieldA: "", FieldC: NestedStruct{FieldB: "nestedValue"}}, expected: fmt.Errorf("FieldA cannot be empty")},
+		{name: "Invalid non-struct input", input: "string", expected: fmt.Errorf("validateApp expects a struct")},
 	}
 
 	for _, test := range tests {
-		t.Run(test.Name, func(t *testing.T) {
-			err := ApplicationBanner(test.Input.app, test.Input.clearScreen)
-			if test.Expected == nil {
+		t.Run(test.name, func(t *testing.T) {
+			err := ValidateStruct(test.input)
+			if test.expected == nil {
 				if err != nil {
-					t.Errorf("ApplicationBanner() - %v error = %v, expected nil", test.Name, err)
+					t.Errorf("ValidateStruct() - %v error = %v, expected nil", test.name, err)
 				}
 			} else {
-				if err == nil || err.Error() != test.Expected.Error() {
-					t.Errorf("ApplicationBanner() - %v error = %v, expected %v", test.Name, err, test.Expected)
+				if err == nil || err.Error() != test.expected.Error() {
+					t.Errorf("ValidateStruct() - %v error = %v, expected %v", test.name, err, test.expected)
 				}
-			}
-		})
-	}
-}
-
-// TestClearTerminalScreen tests the ClearTerminalScreen func.
-func TestClearTerminalScreen(t *testing.T) {
-	type InputStruct struct {
-		goos string
-	}
-	type ExpectedOutcome struct {
-		shouldFail bool
-		err        error
-	}
-
-	// helper to determine the fail and error based on os
-	expectedResultsBasedOnOS := func(inputOS string) ExpectedOutcome {
-		shouldFail := runtime.GOOS != inputOS
-
-		if inputOS == "unknown" {
-			return ExpectedOutcome{
-				true,
-				fmt.Errorf("unsupported platform: %s", "unknown"),
-			}
-		} else if shouldFail {
-			return ExpectedOutcome{
-				true,
-				fmt.Errorf("failed to clear terminal"),
-			}
-		}
-
-		return ExpectedOutcome{
-			false,
-			nil,
-		}
-	}
-
-	tests := []*types.TestLayout[InputStruct, ExpectedOutcome]{
-		// ExpectedOutcome is calculated before the test runs
-		{Name: "Test Linux clear command", Input: InputStruct{goos: "linux"}},
-		{Name: "Test Windows clear command", Input: InputStruct{goos: "windows"}},
-		{Name: "Test unsupported OS", Input: InputStruct{goos: "unknown"}},
-	}
-
-	for _, test := range tests {
-		t.Run(test.Name, func(t *testing.T) {
-			// Determine if the test should fail based on the current OS
-			results := expectedResultsBasedOnOS(test.Input.goos)
-
-			test.Expected.shouldFail = results.shouldFail
-			test.Expected.err = results.err
-
-			err := ClearTerminalScreen(test.Input.goos)
-			switch {
-			case err != nil && test.Expected.err == nil:
-				t.Errorf("ClearTerminalScreen() - %v(%q) = %v; expected no error", test.Name, test.Input, err)
-			case err == nil && test.Expected.err != nil:
-				t.Errorf("ClearTerminalScreen() - %v(%q) = no error; expected %v", test.Name, test.Input, test.Expected.err)
-			case err != nil && test.Expected.err != nil && !strings.Contains(err.Error(), test.Expected.err.Error()):
-				t.Errorf("ClearTerminalScreen() - %v(%q) = %v; expected %v", test.Name, test.Input, err, test.Expected.err)
 			}
 		})
 	}
@@ -278,6 +194,33 @@ func TestToFileType(t *testing.T) {
 			result := ToFileType(test.Input)
 			if result != test.Expected {
 				t.Errorf("TestToFileType() - %v(%q) = %q; expected %q", test.Name, test.Input, result, test.Expected)
+			}
+		})
+	}
+}
+
+// TestToFileType_ErrorFromToLowerWrapper tests ToFileType func simulating a ToLowerWrapper err.
+func TestToFileType_ErrorFromToLowerWrapper(t *testing.T) {
+	// Mock the ToLowerWrapper function to simulate an error
+	originalToLowerWrapper := ToLowerWrapper
+	defer func() { ToLowerWrapper = originalToLowerWrapper }()
+	ToLowerWrapper = func(i interface{}) (string, error) {
+		return "", errors.New("mock error")
+	}
+
+	tests := []*types.TestLayout[string, types.FileType]{
+		{Name: "Test any type with error", Input: "any", Expected: "", Err: errors.New("mock error")},
+		{Name: "Test video type with error", Input: "video", Expected: "", Err: errors.New("mock error")},
+		{Name: "Test image type with error", Input: "image", Expected: "", Err: errors.New("mock error")},
+		{Name: "Test archive type with error", Input: "archive", Expected: "", Err: errors.New("mock error")},
+		{Name: "Test documents type with error", Input: "documents", Expected: "", Err: errors.New("mock error")},
+	}
+
+	for _, test := range tests {
+		t.Run(test.Name, func(t *testing.T) { // Run each test case as a sub-test
+			result := ToFileType(test.Input)
+			if result != test.Expected {
+				t.Errorf("TestToFileType_ErrorFromToLowerWrapper() - %v(%q) = %q; expected %q", test.Name, test.Input, result, test.Expected)
 			}
 		})
 	}
@@ -320,6 +263,33 @@ func TestToOperatorType(t *testing.T) {
 			result := ToOperatorType(test.Input)
 			if result != test.Expected {
 				t.Errorf("ToOperatorType() - %v(%q) = %q; expected %q", test.Name, test.Input, result, test.Expected)
+			}
+		})
+	}
+}
+
+// TestToOperatorType_ErrorFromToLowerWrapper tests ToOperatorType func simulating a ToLowerWrapper error.
+func TestToOperatorType_ErrorFromToLowerWrapper(t *testing.T) {
+	// Mock the ToLowerWrapper function to simulate an error
+	originalToLowerWrapper := ToLowerWrapper
+	defer func() { ToLowerWrapper = originalToLowerWrapper }()
+	ToLowerWrapper = func(input interface{}) (string, error) {
+		return "", errors.New("mock error")
+	}
+
+	tests := []*types.TestLayout[string, types.OperatorType]{
+		{Name: "Test equal to with error", Input: "et", Expected: "", Err: errors.New("mock error")},
+		{Name: "Test greater than with error", Input: "gt", Expected: "", Err: errors.New("mock error")},
+		{Name: "Test greater than or equal to with error", Input: "gte", Expected: "", Err: errors.New("mock error")},
+		{Name: "Test less than with error", Input: "lt", Expected: "", Err: errors.New("mock error")},
+		{Name: "Test less than or equal to with error", Input: "lte", Expected: "", Err: errors.New("mock error")},
+	}
+
+	for _, test := range tests {
+		t.Run(test.Name, func(t *testing.T) { // Run each test case as a sub-test
+			result := ToOperatorType(test.Input)
+			if result != test.Expected {
+				t.Errorf("TestToOperatorType_ErrorFromToLowerWrapper() - %v(%q) = %q; expected %q", test.Name, test.Input, result, test.Expected)
 			}
 		})
 	}
@@ -368,6 +338,45 @@ func TestIsExtensionValid(t *testing.T) {
 			result := IsExtensionValid(test.Input.FileType, test.Input.Path)
 			if result != test.Expected {
 				t.Errorf("IsExtensionValid(%q, %q) - %v  = %v; expected %v", test.Input.FileType, test.Input.Path, test.Name, result, test.Expected)
+			}
+		})
+	}
+}
+
+// TestIsExtensionValid_ErrorFromToLowerWrapper tests IsExtensionValid func simulating ToLowerWrapper err.
+func TestIsExtensionValid_ErrorFromToLowerWrapper(t *testing.T) {
+	// Mock the ToLowerWrapper function to simulate an error
+	originalToLowerWrapper := ToLowerWrapper
+	defer func() { ToLowerWrapper = originalToLowerWrapper }()
+	ToLowerWrapper = func(input interface{}) (string, error) {
+		return "", errors.New("mock error")
+	}
+
+	// Define file types and extensions for testing
+	fileType := types.FileType("exampleType")
+	types.FileExtensions = map[types.FileType]map[string]bool{
+		fileType: {
+			"*.txt": true,
+			"*.*":   true,
+		},
+	}
+
+	tests := []struct {
+		Name     string
+		FileType types.FileType
+		Path     string
+		Expected bool
+	}{
+		{Name: "Test valid file type with error", FileType: fileType, Path: "testfile.txt", Expected: false},   // Expect false due to error
+		{Name: "Test wildcard entry with error", FileType: fileType, Path: "testfile.pdf", Expected: false},    // Expect false due to error
+		{Name: "Test unknown file type with error", FileType: fileType, Path: "testfile.xyz", Expected: false}, // Expect false due to error
+	}
+
+	for _, test := range tests {
+		t.Run(test.Name, func(t *testing.T) { // Run each test case as a sub-test
+			result := IsExtensionValid(test.FileType, test.Path)
+			if result != test.Expected {
+				t.Errorf("TestIsExtensionValid_ErrorFromToLowerWrapper() - %v(%q, %q) = %v; expected %v", test.Name, test.FileType, test.Path, result, test.Expected)
 			}
 		})
 	}
@@ -530,6 +539,34 @@ func TestConvertStringSizeToBytes(t *testing.T) {
 	}
 }
 
+func TestConvertStringSizeToBytes_ErrorFromToUpperWrapper(t *testing.T) {
+	// Mock the ToUpperWrapper function to simulate an error
+	originalToUpperWrapper := ToUpperWrapper
+	defer func() { ToUpperWrapper = originalToUpperWrapper }()
+	ToUpperWrapper = func(input interface{}) (string, error) {
+		return "", errors.New("mock error converting unit")
+	}
+
+	tests := []*types.TestLayout[string, int64]{
+		{Name: "Test valid size with error", Input: "10 MB", Expected: 0, Err: errors.New("error converting unitStr to uppercase: ")}, // Expect 0 due to error
+		{Name: "Test invalid format with error", Input: "invalid", Expected: 0, Err: errors.New("invalid size format")},               // Expect 0 due to invalid format
+		{Name: "Test missing unit with error", Input: "1000", Expected: 0, Err: errors.New("invalid size format")},                    // Expect 0 due to invalid format
+	}
+
+	for _, test := range tests {
+		t.Run(test.Name, func(t *testing.T) { // Run each test case as a sub-test
+			result, err := ConvertStringSizeToBytes(test.Input)
+			if result != test.Expected {
+				t.Errorf("ConvertStringSizeToBytes(%q) - %v = %v; want %v", test.Input, test.Name, result, test.Expected)
+			}
+
+			if (err != nil && test.Err == nil) || (err == nil && test.Err != nil) || (err != nil && test.Err != nil && err.Error() != test.Err.Error()) {
+				t.Errorf("ConvertStringSizeToBytes(%q) - %v error = %v; want %v", test.Input, test.Name, err, test.Err)
+			}
+		})
+	}
+}
+
 // TestRemoveEmptyDir tests RemoveEmptyDir func.
 func TestRemoveEmptyDir(t *testing.T) {
 	// Create paths for test cases
@@ -639,20 +676,5 @@ func TestInRange(t *testing.T) {
 				t.Errorf("InRange(%v, %v) - %v = %v; expected %v", test.Input.target, test.Input.options, test.Name, err, test.Err)
 			}
 		})
-	}
-}
-
-func TestDefaultToLowerWrapper(t *testing.T) {
-	// Test the default behavior of ToLowerWrapper
-	input := "TeSt"
-	expected := "test"
-
-	result, err := ToLowerWrapper(input)
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
-
-	if result != expected {
-		t.Errorf("ToLowerWrapper(%v) = %v; expected %v", input, result, expected)
 	}
 }

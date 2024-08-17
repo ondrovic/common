@@ -25,3 +25,6 @@ go.work.sum
 
 # vscode
 .vscode/
+
+# main.go - this is a lib so we don't really need this more for me to test stuff
+main.go

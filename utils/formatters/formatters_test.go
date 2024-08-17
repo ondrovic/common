@@ -115,6 +115,32 @@ func TestToLower(t *testing.T) {
 	}
 }
 
+// TestToUpper tests ToUpper func.
+func TestToUpper(t *testing.T) {
+	expectedResult := "HELLO WORLD"
+	tests := []*types.TestLayout[interface{}, string]{
+		{Name: "Test all uppercase", Input: "HELLO WORLD", Expected: expectedResult},
+		{Name: "Test title case", Input: "Hello world", Expected: expectedResult},
+		{Name: "Test camel case", Input: "hello World", Expected: expectedResult},
+		{Name: "Test lower case", Input: "hello world", Expected: expectedResult},
+		{Name: "Test error", Input: 52, Expected: "", Err: fmt.Errorf("input is not a string")},
+	}
+
+	for _, test := range tests {
+		t.Run(test.Name, func(t *testing.T) {
+			result, err := ToUpper(test.Input)
+
+			if result != test.Expected {
+				t.Errorf("ToUpper(%q) - %v = %q; expected %q", test.Input, test.Name, result, test.Expected)
+			}
+
+			if (err != nil && test.Err == nil) || (err == nil && test.Err != nil) || (err != nil && test.Err != nil && err.Error() != test.Err.Error()) {
+				t.Errorf("ToUpper(%q) - %v = %q; expected %q", test.Input, test.Name, err, test.Err)
+			}
+		})
+	}
+}
+
 // TestContains tests Contains func.
 func TestContains(t *testing.T) {
 	type InputStruct struct {

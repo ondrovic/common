@@ -4,30 +4,25 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"reflect"
-	"runtime"
 	"strconv"
 	"strings"
 	"unicode"
 
 	"github.com/ondrovic/common/types"
 	"github.com/ondrovic/common/utils/formatters"
-	"github.com/pterm/pterm"
 )
 
 var (
-	cmd            *exec.Cmd
 	osStatFunc     = os.Stat
 	ToLowerWrapper = func(input interface{}) (string, error) {
 		return formatters.ToLower(input)
 	}
+	ToUpperWrapper = func(input interface{}) (string, error) {
+		return formatters.ToUpper(input)
+	}
 )
-
-//TODO: replace all strings.ToLower with ToLowerWrapper
-//TODO: make ToContainsWrapper
-//TODO: replace strings.Contains with ToContainsWrapper
 
 // Function to check if a string field is empty.
 func validateStringField(fieldName, value string) error {
@@ -46,7 +41,7 @@ func validateStructField(fieldName string, value reflect.Value) error {
 }
 
 // Validate function using reflection.
-func validateStruct(app interface{}) error {
+func ValidateStruct(app interface{}) error {
 	v := reflect.ValueOf(app)
 
 	// If it's a pointer, dereference it
@@ -80,55 +75,14 @@ func validateStruct(app interface{}) error {
 	return nil
 }
 
-// The function `ApplicationBanner` validates and displays an application banner with specified styles.
-func ApplicationBanner(app *types.Application, clearScreen func(string) error) error {
-	if err := clearScreen(runtime.GOOS); err != nil {
-		return err
-	}
-
-	if err := validateStruct(app); err != nil {
-		return err
-	}
-
-	pterm.DefaultHeader.
-		WithFullWidth().
-		WithBackgroundStyle(
-			pterm.NewStyle(app.Style.Color.Background),
-		).
-		WithTextStyle(
-			pterm.NewStyle(app.Style.Color.Foreground),
-		).
-		Println(app.Name)
-	return nil
-}
-
-// The function `ClearTerminalScreen` clears the terminal screen based on the operating system specified
-// by the `goos` parameter.
-func ClearTerminalScreen(goos string) error {
-	switch strings.ToLower(goos) {
-	case "linux", "darwin":
-		cmd = exec.Command("clear")
-	case "windows":
-		cmd = exec.Command("cmd", "/c", "cls")
-	default:
-		return fmt.Errorf("unsupported platform: %s", goos)
-	}
-
-	// attach to current process
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	// Run the command
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("failed to clear terminal")
-	}
-
-	return nil
-}
-
 // The function `ToFileType` converts a string representation of a file type to a corresponding enum
 // value from the `types.FileType` enum.
 func ToFileType(fileType string) types.FileType {
-	switch strings.ToLower(fileType) {
+	fileTypeToLower, err := ToLowerWrapper(fileType)
+	if err != nil {
+		return ""
+	}
+	switch fileTypeToLower {
 	case "any":
 		return types.FileTypes.Any
 	case "video":
@@ -147,7 +101,11 @@ func ToFileType(fileType string) types.FileType {
 // The function `ToOperatorType` converts a string representation of an operator type to its
 // corresponding enum value.
 func ToOperatorType(operatorType string) types.OperatorType {
-	switch strings.ToLower(operatorType) {
+	operatorTypeToLower, err := ToLowerWrapper(operatorType)
+	if err != nil {
+		return ""
+	}
+	switch operatorTypeToLower {
 	case "et", "equal to", "equalto", "equal", "==":
 		return types.OperatorTypes.EqualTo
 	case "gt", "greater", "greater than", "greaterthan", ">":
@@ -166,7 +124,10 @@ func ToOperatorType(operatorType string) types.OperatorType {
 // The IsExtensionValid function checks if a given file extension is valid for a specified file type
 // based on a predefined list of allowed extensions.
 func IsExtensionValid(fileType types.FileType, path string) bool {
-	ext := strings.ToLower(filepath.Ext(path))
+	ext, err := ToLowerWrapper(filepath.Ext(path))
+	if err != nil {
+		return false
+	}
 	extensions, exists := types.FileExtensions[fileType]
 	if !exists {
 		return false
@@ -255,11 +216,11 @@ func CalculateTolerances(wantedFileSize int64, toleranceSize float64) (types.Tol
 	}, nil
 }
 
-// TODO: make over version of TrimSpace with error handling use interface{}
-// TODO: make over version of ToUpper with error handling use interface{}
 // The function `ConvertStringSizeToBytes` converts a string representation of size with units to
 // bytes.
 func ConvertStringSizeToBytes(sizeStr string) (int64, error) {
+	var err error
+
 	sizeStr = strings.TrimSpace(sizeStr)
 	if sizeStr == "" {
 		return 0, errors.New("size cannot be empty")
@@ -281,8 +242,11 @@ func ConvertStringSizeToBytes(sizeStr string) (int64, error) {
 	}
 
 	// Normalize the unit string to uppercase
-	unitStr = strings.ToUpper(unitStr)
-
+	// unitStr = strings.ToUpper(unitStr)
+	unitStr, err = ToUpperWrapper(unitStr)
+	if err != nil {
+		return 0, fmt.Errorf("error converting unitStr to uppercase: %v", unitStr)
+	}
 	// Parse the numeric part
 	num, err := strconv.ParseFloat(numStr, 64)
 	if err != nil {

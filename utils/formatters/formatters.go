@@ -21,6 +21,16 @@ func ToLower(i interface{}) (string, error) {
 	return strings.ToLower(str), nil
 }
 
+// ToUpper converts an interface{} to a uppercase string.
+// It returns an error if the input is not a string.
+func ToUpper(i interface{}) (string, error) {
+	str, ok := i.(string)
+	if !ok {
+		return "", errors.New("input is not a string")
+	}
+	return strings.ToUpper(str), nil
+}
+
 // Contains checks if a string contains another substring or any substring from a slice of strings.
 // It returns an error if the main string is empty or if subStr is neither a string nor a slice of strings.
 func Contains(s string, subStr interface{}) (bool, error) {
@@ -49,7 +59,7 @@ func Contains(s string, subStr interface{}) (bool, error) {
 	}
 }
 
-// The Pluralize function takes a count and returns the singular or plural form of a word based on the
+// The Pluralize function takes a count and returns the singular or plural form of a word based on the.
 // count.
 func Pluralize(count interface{}, singular, plural string) (string, error) {
 	// Validate that count is an integer type
@@ -71,7 +81,7 @@ func Pluralize(count interface{}, singular, plural string) (string, error) {
 	}
 }
 
-// The `FormatPath` function converts file paths to either Windows or Unix style based on the operating
+// The `FormatPath` function converts file paths to either Windows or Unix style based on the operating.
 // system specified.
 func FormatPath(path, goos string) string {
 	switch goos {
@@ -87,7 +97,7 @@ func FormatPath(path, goos string) string {
 	}
 }
 
-// The `FormatSize` function converts a given size in bytes to a human-readable format with appropriate
+// The `FormatSize` function converts a given size in bytes to a human-readable format with appropriate.
 // units.
 func FormatSize(bytes int64) string {
 	for _, unit := range types.SizeUnits {
